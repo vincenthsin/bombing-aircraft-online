@@ -5,12 +5,14 @@ let myShips = [];
 let rotation = 0; // 0, 90, 180, 270
 const SHIP_SHAPE = [
     { x: 0, y: -1 }, // Head
-    { x: -1, y: 0 }, { x: 0, y: 0 }, { x: 1, y: 0 }, // Wings + Body center
-    { x: 0, y: 1 } // Tail
-    // 5 parts total. "Cruciform"
+    { x: -2, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 0 }, { x: 1, y: 0 }, { x: 2, y: 0 }, // Neck/Wings (5 wide)
+    { x: 0, y: 1 }, // Body
+    { x: -1, y: 2 }, { x: 0, y: 2 }, { x: 1, y: 2 } // Tail (3 wide)
+    // 10 parts total. "User Heavy Bomber"
     //      H
-    //    W B W
-    //      T
+    //    WWBWW
+    //      B
+    //     TTT
 ];
 
 // DOM Elements
