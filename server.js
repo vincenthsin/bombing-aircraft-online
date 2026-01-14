@@ -30,7 +30,7 @@ io.on('connection', (socket) => {
         if (queue.length > 0) {
             const opponentId = queue.shift();
             const gameId = `${socket.id}-${opponentId}`;
-            
+
             games[gameId] = {
                 player1Id: opponentId,
                 player2Id: socket.id,
@@ -56,11 +56,11 @@ io.on('connection', (socket) => {
         // Validate and store ships
         players[socket.id].ships = ships;
         players[socket.id].ready = true;
-        
+
         // Update board state with ships (internally)
         // In a real game, we'd validate these positions rigorously
         ships.forEach(ship => {
-            ship.coords.forEach(({x, y}) => {
+            ship.coords.forEach(({ x, y }) => {
                 if (x >= 0 && x < 10 && y >= 0 && y < 10) {
                     players[socket.id].board[y][x] = 1; // 1 = Ship present
                 }
@@ -90,36 +90,74 @@ io.on('connection', (socket) => {
 
         const opponentId = (socket.id === game.player1Id) ? game.player2Id : game.player1Id;
         const opponent = players[opponentId];
-        
+
         // Check hit or miss
         let result = 'miss';
         const targetValue = opponent.board[y][x];
 
-        // 0 = empty, 1 = ship, 2 = hit, 3 = miss
-        if (targetValue === 0) {
-            opponent.board[y][x] = 3; // Miss
-            result = 'miss';
-        } else if (targetValue === 1) {
-            opponent.board[y][x] = 2; // Hit
-            result = 'hit';
-            // Check for ship destruction (head shot or full body) - Simplified for now: just hit
-            // In strict rules, we need to know WHICH part of the plane was hit. 
-            // For now, let's just say "Hit".
-        } else {
+        // 0 = empty, 1 = ship, 2 = hit, 3 = miss, 4 = fatal
+        if (targetValue !== 0 && targetValue !== 1) {
             // Already shot here
-            return; 
+            return;
+        }
+
+        // Find which ship was hit (if any)
+        let hitShip = null;
+        let isHead = false;
+
+        for (const ship of opponent.ships) {
+            // ship.coords[0] is HEAD
+            if (ship.coords[0].x === x && ship.coords[0].y === y) {
+                hitShip = ship;
+                isHead = true;
+                break;
+            }
+            // Check body
+            for (let i = 1; i < ship.coords.length; i++) {
+                if (ship.coords[i].x === x && ship.coords[i].y === y) {
+                    hitShip = ship;
+                    break;
+                }
+            }
+            if (hitShip) break;
+        }
+
+        if (hitShip) {
+            if (isHead) {
+                result = 'fatal';
+                opponent.board[y][x] = 4; // Fatal
+                hitShip.destroyed = true; // Mark ship destroyed instantly
+            } else {
+                result = 'hit';
+                opponent.board[y][x] = 2; // Hit
+
+                // Check if this normal hit destroyed the ship (all parts hit)
+                let allHit = true;
+                for (const p of hitShip.coords) {
+                    const cellVal = opponent.board[p.y][p.x];
+                    // If any part is NOT hit (val=1) and NOT fatal (val=4) and NOT hit (val=2) -> then it's alive
+                    // Actually we just check if it is 0 or 1. 
+                    // 1 is intact ship part.
+                    if (opponent.board[p.y][p.x] === 1) {
+                        allHit = false;
+                        break;
+                    }
+                }
+                if (allHit) hitShip.destroyed = true;
+            }
+        } else {
+            result = 'miss';
+            opponent.board[y][x] = 3; // Miss
         }
 
         // Notify result
         io.to(socket.id).emit('shot_result', { x, y, result, isMyShot: true });
         io.to(opponentId).emit('shot_result', { x, y, result, isMyShot: false });
 
-        // Check Win Condition (All ship parts hit? Or just Heads?)
-        // Simplified: Count remaining ship parts
-        let remainingParts = 0;
-        opponent.board.forEach(row => row.forEach(cell => { if(cell === 1) remainingParts++; }));
-        
-        if (remainingParts === 0) {
+        // Check Win Condition: Are ALL ships destroyed?
+        const allDestroyed = opponent.ships.every(s => s.destroyed);
+
+        if (allDestroyed) {
             game.status = 'finished';
             io.to(socket.id).emit('game_over', 'win');
             io.to(opponentId).emit('game_over', 'lose');

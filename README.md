@@ -29,10 +29,30 @@ Built with **Node.js**, **Express**, and **Socket.io**.
     - Open a second tab (or share the link with a friend on the same network) to simulate the opponent.
 
 ## Game Rules
-- Each player places **3 Aircraft**.
-- Aircraft Shape: Cruciform (Head, Wings, Body, Tail).
-- **Turn-based**: Players take turns bombing coordinates on the enemy grid.
-- **Victory**: Destroy all enemy aircraft to win.
+
+### Objective
+The goal is to destroy the enemy's air fleet before they destroy yours.
+
+### The Fleet
+Each player commands a squadron of **3 Aircraft**.
+Every aircraft has a specific shape occupying **10 grid cells**.
+
+### Aircraft Shape
+The aircraft is a **Heavy Bomber** (10 Cells):
+```
+      H        (Head)
+    WWBWW      (Neck/Wings)
+      B        (Body)
+     TTT       (Tail)
+```
+
+### Gameplay
+1.  **Placement**: Drag and drop your 3 aircraft onto the 10x10 grid. Press **'R'** to rotate.
+2.  **Combat**: Players take turns firing at the enemy grid.
+    - **MISS** (Gray): Hitting empty water.
+    - **HIT** (Red): Hitting the wings, body, or tail.
+    - **FATAL** (Black): Hitting the **Head** instantly destroys the entire aircraft.
+3.  **Victory**: Destroy all 3 enemy aircraft to win.
 
 ## License
 MIT
