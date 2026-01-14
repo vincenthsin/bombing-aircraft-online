@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Bombing Aircraft Online</title>
     <link rel="stylesheet" href="style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -27,8 +27,9 @@
                 <div id="placement-board" class="grid-board"></div>
             </div>
             <div class="controls">
-                <button id="confirm-placement-btn" class="cyber-btn">DEPLOY SQUADRON</button>
+                <button id="confirm-placement-btn" class="cyber-btn" style="display: none;">DEPLOY SQUADRON</button>
                 <button id="rotate-btn" class="cyber-btn secondary">ROTATE (R)</button>
+                <button id="reset-btn" class="cyber-btn secondary">RESET BOARD</button>
             </div>
             <p id="placement-msg"></p>
         </div>

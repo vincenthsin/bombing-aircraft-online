@@ -156,6 +156,17 @@ document.getElementById('confirm-placement-btn').addEventListener('click', () =>
     socket.emit('place_ships', { gameId, ships: PLACED_SHIPS });
     document.getElementById('placement-msg').innerText = "Waiting for other player...";
     document.getElementById('confirm-placement-btn').disabled = true;
+    document.getElementById('reset-btn').style.display = 'none'; // Hide reset after confirm
+    document.getElementById('rotate-btn').style.display = 'none';
+});
+
+document.getElementById('reset-btn').addEventListener('click', () => {
+    PLACED_SHIPS.length = 0; // Clear array
+    // Remove all 'ship' classes from board
+    document.querySelectorAll('#placement-board .cell').forEach(cell => {
+        cell.classList.remove('ship');
+    });
+    document.getElementById('confirm-placement-btn').style.display = 'none';
 });
 
 // Gameplay Logic
