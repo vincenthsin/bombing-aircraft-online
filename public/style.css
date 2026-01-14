@@ -1,0 +1,187 @@
+:root {
+    --bg-color: #0b0c10;
+    --grid-bg: #1f2833;
+    --neon-blue: #66fcf1;
+    --neon-green: #45a29e;
+    --neon-red: #ff3860;
+    --text-color: #c5c6c7;
+    --cell-size: 35px;
+}
+
+body {
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    font-family: 'Roboto', sans-serif;
+    margin: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    overflow: hidden;
+}
+
+h1, h2, h3 {
+    font-family: 'Orbitron', sans-serif;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    margin-bottom: 20px;
+}
+
+.screen {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    max-width: 1000px;
+    animation: fadeIn 0.5s ease-in;
+}
+
+.screen.active {
+    display: flex;
+}
+
+/* Lobby */
+.glitch-text {
+    font-size: 3rem;
+    color: var(--neon-blue);
+    text-shadow: 0 0 10px var(--neon-blue);
+}
+
+.cyber-btn {
+    background: transparent;
+    border: 2px solid var(--neon-blue);
+    color: var(--neon-blue);
+    padding: 15px 40px;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 1.2rem;
+    cursor: pointer;
+    transition: all 0.3s;
+    margin: 10px;
+    text-transform: uppercase;
+}
+
+.cyber-btn:hover {
+    background: var(--neon-blue);
+    color: var(--bg-color);
+    box-shadow: 0 0 20px var(--neon-blue);
+}
+
+.cyber-btn.secondary {
+    border-color: var(--neon-green);
+    color: var(--neon-green);
+}
+
+.cyber-btn.secondary:hover {
+    background: var(--neon-green);
+    color: var(--bg-color);
+    box-shadow: 0 0 20px var(--neon-green);
+}
+
+/* Grids */
+.battlefield {
+    display: flex;
+    gap: 50px;
+    margin: 20px 0;
+}
+
+@media (max-width: 800px) {
+    .battlefield {
+        flex-direction: column;
+        gap: 20px;
+    }
+}
+
+.grid-board {
+    display: grid;
+    grid-template-columns: repeat(10, var(--cell-size));
+    grid-template-rows: repeat(10, var(--cell-size));
+    gap: 2px;
+    background-color: var(--grid-bg);
+    border: 2px solid var(--neon-blue);
+    padding: 5px;
+    box-shadow: 0 0 15px rgba(102, 252, 241, 0.1);
+}
+
+.grid-board.locked {
+    pointer-events: none;
+    opacity: 0.8;
+}
+
+.cell {
+    width: var(--cell-size);
+    height: var(--cell-size);
+    background-color: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    cursor: crosshair;
+    transition: background 0.2s;
+}
+
+.cell:hover {
+    background-color: rgba(102, 252, 241, 0.2);
+}
+
+.cell.ship {
+    background-color: var(--neon-green);
+    box-shadow: inset 0 0 10px var(--neon-green);
+}
+
+.cell.hit {
+    background-color: var(--neon-red);
+    box-shadow: 0 0 15px var(--neon-red);
+    animation: flash 0.5s;
+}
+
+.cell.miss {
+    background-color: #888;
+    opacity: 0.5;
+}
+
+.cell.preview {
+    background-color: rgba(102, 252, 241, 0.5);
+}
+
+.cell.preview-invalid {
+    background-color: rgba(255, 56, 96, 0.5);
+}
+
+/* HUD */
+.hud {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+    margin-bottom: 20px;
+    align-items: center;
+}
+
+.turn-indicator {
+    font-size: 1.5rem;
+    color: var(--neon-blue);
+    border: 1px solid var(--neon-blue);
+    padding: 10px 20px;
+}
+
+.turn-indicator.my-turn {
+    background: var(--neon-blue);
+    color: var(--bg-color);
+}
+
+#game-log {
+    width: 100%;
+    height: 30px;
+    background: rgba(0,0,0,0.5);
+    border-top: 1px solid var(--grid-bg);
+    text-align: center;
+    line-height: 30px;
+    font-family: monospace;
+    color: var(--neon-green);
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes flash {
+    0% { background-color: #fff; }
+    100% { background-color: var(--neon-red); }
+}

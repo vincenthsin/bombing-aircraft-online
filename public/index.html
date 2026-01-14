@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bombing Aircraft Online</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="app">
+        <!-- Login / Lobby Screen -->
+        <div id="lobby-screen" class="screen active">
+            <h1 class="glitch-text">BOMBING AIRCRAFT</h1>
+            <p>TACTICAL ONLINE WARFARE</p>
+            <button id="join-btn" class="cyber-btn">FIND MATCH</button>
+            <p id="status-msg"></p>
+        </div>
+
+        <!-- Placement Screen -->
+        <div id="placement-screen" class="screen">
+            <h2>ENSURE AIR SUPERIORITY</h2>
+            <p>Place your 3 aircraft. R: Rotate.</p>
+            <div class="game-container">
+                <div id="placement-board" class="grid-board"></div>
+            </div>
+            <div class="controls">
+                <button id="confirm-placement-btn" class="cyber-btn">DEPLOY SQUADRON</button>
+                <button id="rotate-btn" class="cyber-btn secondary">ROTATE (R)</button>
+            </div>
+            <p id="placement-msg"></p>
+        </div>
+
+        <!-- Gameplay Screen -->
+        <div id="game-screen" class="screen">
+            <div class="hud">
+                <div class="player-info waiting" id="my-status">YOU</div>
+                <div class="turn-indicator" id="turn-display">WAITING...</div>
+                <div class="player-info" id="enemy-status">ENEMY</div>
+            </div>
+            
+            <div class="battlefield">
+                <div class="board-wrapper">
+                    <h3>MY AIRSPACE</h3>
+                    <div id="my-board" class="grid-board locked"></div>
+                </div>
+                <div class="board-wrapper">
+                    <h3>ENEMY RADAR</h3>
+                    <div id="enemy-board" class="grid-board"></div>
+                </div>
+            </div>
+            <div id="game-log">System Initialized...</div>
+        </div>
+
+        <!-- Game Over Screen -->
+        <div id="result-screen" class="screen">
+            <h1 id="result-title">MISSION ACCOMPLISHED</h1>
+            <button onclick="location.reload()" class="cyber-btn">RETURN TO BASE</button>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="game.js"></script>
+</body>
+</html>

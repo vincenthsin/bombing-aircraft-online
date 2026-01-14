@@ -11,3 +11,5 @@ image
 .settings
 .classpath
 build
+
+node_modules/
