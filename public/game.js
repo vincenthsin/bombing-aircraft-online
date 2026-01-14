@@ -53,6 +53,8 @@ const MAX_SHIPS = 3;
 
 function initPlacementBoard() {
     placementBoard.innerHTML = '';
+
+    // PC: Mouse Events
     for (let y = 0; y < 10; y++) {
         for (let x = 0; x < 10; x++) {
             const cell = document.createElement('div');
@@ -66,6 +68,45 @@ function initPlacementBoard() {
 
             placementBoard.appendChild(cell);
         }
+    }
+
+    // Mobile: Touch Events (Container Level)
+    placementBoard.addEventListener('touchstart', handleTouch, { passive: false });
+    placementBoard.addEventListener('touchmove', handleTouch, { passive: false });
+    placementBoard.addEventListener('touchend', handleTouchEnd, { passive: false });
+}
+
+let lastTouchTarget = null;
+
+function handleTouch(e) {
+    if (e.target.closest('.grid-board')) {
+        e.preventDefault(); // Stop scrolling
+    }
+
+    const touch = e.touches[0];
+    const element = document.elementFromPoint(touch.clientX, touch.clientY);
+
+    if (element && element.classList.contains('cell')) {
+        const x = parseInt(element.dataset.x);
+        const y = parseInt(element.dataset.y);
+
+        if (lastTouchTarget !== element) {
+            previewShip(x, y);
+            lastTouchTarget = element;
+        }
+    } else {
+        clearPreview();
+        lastTouchTarget = null;
+    }
+}
+
+function handleTouchEnd(e) {
+    if (lastTouchTarget) {
+        const x = parseInt(lastTouchTarget.dataset.x);
+        const y = parseInt(lastTouchTarget.dataset.y);
+        placeShip(x, y);
+        clearPreview(); // Clear preview after placing
+        lastTouchTarget = null;
     }
 }
 
