@@ -1,5 +1,92 @@
 const socket = io();
 
+// Localization
+const TRANSLATIONS = {
+    en: {
+        title: "BOMBING AIRCRAFT",
+        subtitle: "TACTICAL ONLINE WARFARE",
+        find_match: "FIND MATCH",
+        searching: "Searching for opponent...",
+        place_header: "ENSURE AIR SUPERIORITY",
+        place_instruction: "Deploy your 3 aircraft.",
+        deploy: "DEPLOY SQUADRON",
+        rotate: "ROTATE (R)",
+        reset: "RESET BOARD",
+        waiting_opponent: "Waiting for other player...",
+        you: "YOU",
+        enemy: "ENEMY",
+        waiting: "WAITING...",
+        my_airspace: "MY AIRSPACE",
+        enemy_radar: "ENEMY RADAR",
+        system_init: "System Initialized...",
+        your_turn: "YOUR TURN",
+        enemy_turn: "ENEMY TURN",
+        return_base: "RETURN TO BASE",
+        victory: "VICTORY ACHIEVED",
+        defeat: "MISSION FAILED",
+        log_miss: "MISS",
+        log_hit: "HIT",
+        log_fatal: "FATAL",
+        log_you_fired: "You fired at",
+        log_enemy_fired: "Enemy fired at"
+    },
+    zh: {
+        title: "炸飞机 OL",
+        subtitle: "线上战术对决",
+        find_match: "寻找对局",
+        searching: "正在寻找对手...",
+        place_header: "确保制空权",
+        place_instruction: "部署您的 3 架战机。",
+        deploy: "部署编队",
+        rotate: "旋转 (R)",
+        reset: "重置棋盘",
+        waiting_opponent: "等待对手...",
+        you: "我方",
+        enemy: "敌方",
+        waiting: "等待中...",
+        my_airspace: "我方空域",
+        enemy_radar: "敌方雷达",
+        system_init: "系统初始化完成...",
+        your_turn: "你的回合",
+        enemy_turn: "对手回合",
+        return_base: "返回基地",
+        victory: "任务完成",
+        defeat: "任务失败",
+        log_miss: "未击中",
+        log_hit: "命中",
+        log_fatal: "击毁机头",
+        log_you_fired: "你攻击了",
+        log_enemy_fired: "敌方攻击了"
+    }
+};
+
+let currentLang = 'en';
+
+function initLocalization() {
+    // Detect language: Default to 'en', switch to 'zh' if navigator.language starts with 'zh'
+    const browserLang = navigator.language || navigator.userLanguage;
+    currentLang = browserLang.startsWith('zh') ? 'zh' : 'en';
+
+    console.log("Detected Language:", browserLang, "=>", currentLang);
+    applyTranslations();
+}
+
+function applyTranslations() {
+    const texts = TRANSLATIONS[currentLang];
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+        const key = el.getAttribute('data-i18n');
+        if (texts[key]) el.innerText = texts[key];
+    });
+}
+
+function t(key) {
+    return TRANSLATIONS[currentLang][key] || key;
+}
+
+// Init immediately
+initLocalization();
+
+
 // State
 let myShips = [];
 let rotation = 0; // 0, 90, 180, 270
@@ -31,7 +118,7 @@ function showScreen(name) {
 // Lobby Logic
 document.getElementById('join-btn').addEventListener('click', () => {
     socket.emit('join_game');
-    document.getElementById('status-msg').innerText = "Searching for opponent...";
+    document.getElementById('status-msg').innerText = t('searching');
 });
 
 socket.on('waiting', (msg) => {
@@ -195,7 +282,7 @@ function placeShip(x, y) {
 
 document.getElementById('confirm-placement-btn').addEventListener('click', () => {
     socket.emit('place_ships', { gameId, ships: PLACED_SHIPS });
-    document.getElementById('placement-msg').innerText = "Waiting for other player...";
+    document.getElementById('placement-msg').innerText = t('waiting_opponent');
     document.getElementById('confirm-placement-btn').disabled = true;
     document.getElementById('reset-btn').style.display = 'none'; // Hide reset after confirm
     document.getElementById('rotate-btn').style.display = 'none';
@@ -255,11 +342,11 @@ socket.on('round_start', ({ yourTurn }) => {
 function updateTurnUI(isMyTurn) {
     const turnDisplay = document.getElementById('turn-display');
     if (isMyTurn) {
-        turnDisplay.innerText = "YOUR TURN";
+        turnDisplay.innerText = t('your_turn');
         turnDisplay.classList.add('my-turn');
         enemyBoard.classList.remove('locked');
     } else {
-        turnDisplay.innerText = "ENEMY TURN";
+        turnDisplay.innerText = t('enemy_turn');
         turnDisplay.classList.remove('my-turn');
         enemyBoard.classList.add('locked');
     }
@@ -276,7 +363,7 @@ socket.on('shot_result', ({ x, y, result, isMyShot }) => {
 
     cell.classList.add(result); // 'hit' or 'miss'
 
-    const msg = isMyShot ? `You fired at (${x},${y}): ${result.toUpperCase()}` : `Enemy fired at (${x},${y}): ${result.toUpperCase()}`;
+    const msg = isMyTurn ? `${t('log_you_fired')} (${x},${y}): ${t('log_' + result)}` : `${t('log_enemy_fired')} (${x},${y}): ${t('log_' + result)}`;
     document.getElementById('game-log').innerText = msg;
 });
 
@@ -289,10 +376,10 @@ socket.on('game_over', (result) => {
     showScreen('result');
     const title = document.getElementById('result-title');
     if (result === 'win') {
-        title.innerText = "VICTORY ACHIEVED";
+        title.innerText = t('victory');
         title.style.color = "var(--neon-green)";
     } else {
-        title.innerText = "MISSION FAILED";
+        title.innerText = t('defeat');
         title.style.color = "var(--neon-red)";
     }
 });

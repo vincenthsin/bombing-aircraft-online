@@ -13,23 +13,23 @@
     <div id="app">
         <!-- Login / Lobby Screen -->
         <div id="lobby-screen" class="screen active">
-            <h1 class="glitch-text">BOMBING AIRCRAFT</h1>
-            <p>TACTICAL ONLINE WARFARE</p>
-            <button id="join-btn" class="cyber-btn">FIND MATCH</button>
+            <h1 class="glitch-text" data-i18n="title">BOMBING AIRCRAFT</h1>
+            <p data-i18n="subtitle">TACTICAL ONLINE WARFARE</p>
+            <button id="join-btn" class="cyber-btn" data-i18n="find_match">FIND MATCH</button>
             <p id="status-msg"></p>
         </div>
 
         <!-- Placement Screen -->
         <div id="placement-screen" class="screen">
-            <h2>ENSURE AIR SUPERIORITY</h2>
-            <p>Place your 3 aircraft. R: Rotate.</p>
+            <h2 data-i18n="place_header">ENSURE AIR SUPERIORITY</h2>
+            <p data-i18n="place_instruction">Deploy your 3 aircraft.</p>
             <div class="game-container">
                 <div id="placement-board" class="grid-board"></div>
             </div>
             <div class="controls">
-                <button id="confirm-placement-btn" class="cyber-btn" style="display: none;">DEPLOY SQUADRON</button>
-                <button id="rotate-btn" class="cyber-btn secondary">ROTATE (R)</button>
-                <button id="reset-btn" class="cyber-btn secondary">RESET BOARD</button>
+                <button id="confirm-placement-btn" class="cyber-btn" style="display: none;" data-i18n="deploy">DEPLOY SQUADRON</button>
+                <button id="rotate-btn" class="cyber-btn secondary" data-i18n="rotate">ROTATE (R)</button>
+                <button id="reset-btn" class="cyber-btn secondary" data-i18n="reset">RESET BOARD</button>
             </div>
             <p id="placement-msg"></p>
         </div>
@@ -37,28 +37,28 @@
         <!-- Gameplay Screen -->
         <div id="game-screen" class="screen">
             <div class="hud">
-                <div class="player-info waiting" id="my-status">YOU</div>
-                <div class="turn-indicator" id="turn-display">WAITING...</div>
-                <div class="player-info" id="enemy-status">ENEMY</div>
+                <div class="player-info waiting" id="my-status" data-i18n="you">YOU</div>
+                <div class="turn-indicator" id="turn-display" data-i18n="waiting">WAITING...</div>
+                <div class="player-info" id="enemy-status" data-i18n="enemy">ENEMY</div>
             </div>
             
             <div class="battlefield">
                 <div class="board-wrapper">
-                    <h3>MY AIRSPACE</h3>
+                    <h3 data-i18n="my_airspace">MY AIRSPACE</h3>
                     <div id="my-board" class="grid-board locked"></div>
                 </div>
                 <div class="board-wrapper">
-                    <h3>ENEMY RADAR</h3>
+                    <h3 data-i18n="enemy_radar">ENEMY RADAR</h3>
                     <div id="enemy-board" class="grid-board"></div>
                 </div>
             </div>
-            <div id="game-log">System Initialized...</div>
+            <div id="game-log" data-i18n="system_init">System Initialized...</div>
         </div>
 
         <!-- Game Over Screen -->
         <div id="result-screen" class="screen">
             <h1 id="result-title">MISSION ACCOMPLISHED</h1>
-            <button onclick="location.reload()" class="cyber-btn">RETURN TO BASE</button>
+            <button onclick="location.reload()" class="cyber-btn" data-i18n="return_base">RETURN TO BASE</button>
         </div>
     </div>
 
