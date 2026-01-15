@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -7,8 +8,11 @@
     <link rel="stylesheet" href="style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Roboto:wght@300;400;700&display=swap"
+        rel="stylesheet">
 </head>
+
 <body>
     <div id="app">
         <!-- Login / Lobby Screen -->
@@ -27,7 +31,8 @@
                 <div id="placement-board" class="grid-board"></div>
             </div>
             <div class="controls">
-                <button id="confirm-placement-btn" class="cyber-btn" style="display: none;" data-i18n="deploy">DEPLOY SQUADRON</button>
+                <button id="confirm-placement-btn" class="cyber-btn" style="display: none;" data-i18n="deploy">DEPLOY
+                    SQUADRON</button>
                 <button id="rotate-btn" class="cyber-btn secondary" data-i18n="rotate">ROTATE (R)</button>
                 <button id="reset-btn" class="cyber-btn secondary" data-i18n="reset">RESET BOARD</button>
             </div>
@@ -40,8 +45,10 @@
                 <div class="player-info waiting" id="my-status" data-i18n="you">YOU</div>
                 <div class="turn-indicator" id="turn-display" data-i18n="waiting">WAITING...</div>
                 <div class="player-info" id="enemy-status" data-i18n="enemy">ENEMY</div>
+                <button id="leave-btn" class="cyber-btn secondary"
+                    style="display: none; padding: 5px 15px; font-size: 0.8rem;" data-i18n="leave_game">LEAVE</button>
             </div>
-            
+
             <div class="battlefield">
                 <div class="board-wrapper">
                     <h3 data-i18n="my_airspace">MY AIRSPACE</h3>
@@ -58,11 +65,15 @@
         <!-- Game Over Screen -->
         <div id="result-screen" class="screen">
             <h1 id="result-title">MISSION ACCOMPLISHED</h1>
-            <button onclick="location.reload()" class="cyber-btn" data-i18n="return_base">RETURN TO BASE</button>
+            <div class="controls">
+                <button id="review-btn" class="cyber-btn secondary" data-i18n="review">REVIEW BATTLEFIELD</button>
+                <button onclick="location.reload()" class="cyber-btn" data-i18n="return_base">RETURN TO BASE</button>
+            </div>
         </div>
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
     <script src="game.js"></script>
 </body>
+
 </html>

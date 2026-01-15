@@ -159,8 +159,8 @@ io.on('connection', (socket) => {
 
         if (allDestroyed) {
             game.status = 'finished';
-            io.to(socket.id).emit('game_over', 'win');
-            io.to(opponentId).emit('game_over', 'lose');
+            io.to(socket.id).emit('game_over', { result: 'win', opponentShips: opponent.ships });
+            io.to(opponentId).emit('game_over', { result: 'lose', opponentShips: players[socket.id].ships });
         } else {
             // Switch Turn
             game.turn = opponentId;

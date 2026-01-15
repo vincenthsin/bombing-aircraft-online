@@ -28,7 +28,9 @@ const TRANSLATIONS = {
         log_hit: "HIT",
         log_fatal: "FATAL",
         log_you_fired: "You fired at",
-        log_enemy_fired: "Enemy fired at"
+        log_enemy_fired: "Enemy fired at",
+        review: "REVIEW BATTLEFIELD",
+        leave_game: "LEAVE GAME"
     },
     zh: {
         title: "炸飞机 OL",
@@ -56,7 +58,9 @@ const TRANSLATIONS = {
         log_hit: "命中",
         log_fatal: "击毁机头",
         log_you_fired: "你攻击了",
-        log_enemy_fired: "敌方攻击了"
+        log_enemy_fired: "敌方攻击了",
+        review: "查看战场",
+        leave_game: "离开游戏"
     }
 };
 
@@ -371,9 +375,12 @@ socket.on('turn_change', (isMyTurn) => {
     updateTurnUI(isMyTurn);
 });
 
-socket.on('game_over', (result) => {
+socket.on('game_over', ({ result, opponentShips }) => {
     // result = 'win' or 'lose'
-    showScreen('result');
+    // Do NOT switch screen, just show result overlay
+    document.getElementById('result-screen').classList.add('active');
+    document.getElementById('leave-btn').style.display = 'block'; // Show leave button in HUD
+
     const title = document.getElementById('result-title');
     if (result === 'win') {
         title.innerText = t('victory');
@@ -382,6 +389,29 @@ socket.on('game_over', (result) => {
         title.innerText = t('defeat');
         title.style.color = "var(--neon-red)";
     }
+
+    // Reveal Opponent Ships
+    if (opponentShips) {
+        opponentShips.forEach(ship => {
+            ship.coords.forEach(p => {
+                const idx = p.y * 10 + p.x;
+                const cell = enemyBoard.children[idx];
+                // Only reveal if not already hit/fatal/miss (i.e., if it looks empty)
+                if (!cell.classList.contains('hit') && !cell.classList.contains('fatal')) {
+                    cell.classList.add('revealed');
+                }
+            });
+        });
+    }
+});
+
+// Game Over Review Controls
+document.getElementById('review-btn').addEventListener('click', () => {
+    document.getElementById('result-screen').classList.remove('active');
+});
+
+document.getElementById('leave-btn').addEventListener('click', () => {
+    location.reload();
 });
 
 socket.on('error', (msg) => {
