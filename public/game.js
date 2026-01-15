@@ -30,7 +30,9 @@ const TRANSLATIONS = {
         log_you_fired: "You fired at",
         log_enemy_fired: "Enemy fired at",
         review: "REVIEW BATTLEFIELD",
-        leave_game: "LEAVE GAME"
+        leave_game: "LEAVE GAME",
+        confirm_ship: "CONFIRM SHIP",
+        deploy_last: "DEPLOY SQUADRON"
     },
     zh: {
         title: "炸飞机 OL",
@@ -60,7 +62,9 @@ const TRANSLATIONS = {
         log_you_fired: "你攻击了",
         log_enemy_fired: "敌方攻击了",
         review: "查看战场",
-        leave_game: "离开游戏"
+        leave_game: "离开游戏",
+        confirm_ship: "确认战机",
+        deploy_last: "部署编队"
     }
 };
 
@@ -94,17 +98,18 @@ initLocalization();
 // State
 let myShips = [];
 let rotation = 0; // 0, 90, 180, 270
+let gameId = null;
+let isMyTurn = false;
+let PLACED_SHIPS = [];
+let pendingShip = null;
+
+// Placement Logic consts
 const SHIP_SHAPE = [
     { x: 0, y: -1 }, // Head
-    { x: -2, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 0 }, { x: 1, y: 0 }, { x: 2, y: 0 }, // Neck/Wings (5 wide)
+    { x: -2, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 0 }, { x: 1, y: 0 }, { x: 2, y: 0 }, // Wings (5 wide)
     { x: 0, y: 1 }, // Body
-    { x: -1, y: 2 }, { x: 0, y: 2 }, { x: 1, y: 2 } // Tail (3 wide)
-    // 10 parts total. "User Heavy Bomber"
-    //      H
-    //    WWBWW
-    //      B
-    //     TTT
-];
+    { x: -1, y: 2 }, { x: 0, y: 2 }, { x: 1, y: 2 } // Tail
+]; // Total 10 cells
 
 // DOM Elements
 const screens = {
@@ -130,22 +135,20 @@ socket.on('waiting', (msg) => {
 });
 
 socket.on('game_start', (data) => {
-    console.log('Game Started:', data);
     gameId = data.gameId;
-    showScreen('placement');
-    initPlacementBoard();
+    document.getElementById('status-msg').innerText = "Match Found!";
+    setTimeout(() => {
+        showScreen('placement');
+        initPlacementBoard();
+        updateDeployButton(); // Update button text initially
+    }, 1000);
 });
 
 // Placement Logic
-let gameId = null;
-const placementBoard = document.getElementById('placement-board');
-const PLACED_SHIPS = [];
-const MAX_SHIPS = 3;
-
 function initPlacementBoard() {
-    placementBoard.innerHTML = '';
+    const board = document.getElementById('placement-board');
+    board.innerHTML = '';
 
-    // PC: Mouse Events
     for (let y = 0; y < 10; y++) {
         for (let x = 0; x < 10; x++) {
             const cell = document.createElement('div');
@@ -153,41 +156,37 @@ function initPlacementBoard() {
             cell.dataset.x = x;
             cell.dataset.y = y;
 
+            // Mouse Interaction
             cell.addEventListener('mouseenter', () => previewShip(x, y));
             cell.addEventListener('mouseleave', () => clearPreview());
             cell.addEventListener('click', () => placeShip(x, y));
 
-            placementBoard.appendChild(cell);
+            board.appendChild(cell);
         }
     }
 
     // Mobile: Touch Events (Container Level)
-    placementBoard.addEventListener('touchstart', handleTouch, { passive: false });
-    placementBoard.addEventListener('touchmove', handleTouch, { passive: false });
-    placementBoard.addEventListener('touchend', handleTouchEnd, { passive: false });
+    board.addEventListener('touchstart', handleTouch, { passive: false });
+    board.addEventListener('touchmove', handleTouch, { passive: false });
+    board.addEventListener('touchend', handleTouchEnd);
 }
 
+// Touch Handling (No changes needed, re-using existing flow)
 let lastTouchTarget = null;
-
 function handleTouch(e) {
     if (e.target.closest('.grid-board')) {
         e.preventDefault(); // Stop scrolling
     }
-
     const touch = e.touches[0];
-    const element = document.elementFromPoint(touch.clientX, touch.clientY);
+    const target = document.elementFromPoint(touch.clientX, touch.clientY);
 
-    if (element && element.classList.contains('cell')) {
-        const x = parseInt(element.dataset.x);
-        const y = parseInt(element.dataset.y);
-
-        if (lastTouchTarget !== element) {
+    if (target && target.classList.contains('cell')) {
+        if (lastTouchTarget !== target) {
+            const x = parseInt(target.dataset.x);
+            const y = parseInt(target.dataset.y);
             previewShip(x, y);
-            lastTouchTarget = element;
+            lastTouchTarget = target;
         }
-    } else {
-        clearPreview();
-        lastTouchTarget = null;
     }
 }
 
@@ -196,19 +195,18 @@ function handleTouchEnd(e) {
         const x = parseInt(lastTouchTarget.dataset.x);
         const y = parseInt(lastTouchTarget.dataset.y);
         placeShip(x, y);
-        clearPreview(); // Clear preview after placing
+        clearPreview();
         lastTouchTarget = null;
     }
 }
 
-document.getElementById('rotate-btn').addEventListener('click', () => {
-    rotation = (rotation + 90) % 360;
-});
-
 document.addEventListener('keydown', (e) => {
     if (e.key === 'r' || e.key === 'R') {
         rotation = (rotation + 90) % 360;
-        // Refresh preview if mouse is hovering
+        // If we have a pending ship, re-orient it immediately
+        if (pendingShip) {
+            placeShip(pendingShip.core.x, pendingShip.core.y);
+        }
     }
 });
 
@@ -233,7 +231,7 @@ function isValidPlacement(coords) {
     // Check bounds
     if (coords.some(p => p.x < 0 || p.x >= 10 || p.y < 0 || p.y >= 10)) return false;
 
-    // Check overlap
+    // Check overlap with CONFIRMED ships
     for (const ship of PLACED_SHIPS) {
         for (const p of ship.coords) {
             if (coords.some(c => c.x === p.x && c.y === p.y)) return false;
@@ -243,7 +241,7 @@ function isValidPlacement(coords) {
 }
 
 function previewShip(x, y) {
-    if (PLACED_SHIPS.length >= MAX_SHIPS) return;
+    if (PLACED_SHIPS.length >= 3) return; // Max 3 confirmed ships
 
     clearPreview();
     const coords = getShipCoords(x, y, rotation);
@@ -252,7 +250,7 @@ function previewShip(x, y) {
     coords.forEach(p => {
         if (p.x >= 0 && p.x < 10 && p.y >= 0 && p.y < 10) {
             const idx = p.y * 10 + p.x;
-            const cell = placementBoard.children[idx];
+            const cell = document.getElementById('placement-board').children[idx];
             cell.classList.add(valid ? 'preview' : 'preview-invalid');
         }
     });
@@ -266,39 +264,109 @@ function clearPreview() {
 }
 
 function placeShip(x, y) {
-    if (PLACED_SHIPS.length >= MAX_SHIPS) return;
+    if (PLACED_SHIPS.length >= 3) return; // Max 3 confirmed
 
     const coords = getShipCoords(x, y, rotation);
-    if (!isValidPlacement(coords)) return;
 
-    PLACED_SHIPS.push({ coords, rotation, core: { x, y } });
+    if (isValidPlacement(coords)) {
+        // Set as PENDING, don't confirm yet
+        pendingShip = { coords, core: { x, y }, rotation };
+        renderPlacementBoard();
 
-    // Draw permanently
-    coords.forEach(p => {
-        const idx = p.y * 10 + p.x;
-        placementBoard.children[idx].classList.add('ship');
-    });
-
-    if (PLACED_SHIPS.length === MAX_SHIPS) {
+        // Show confirm button
         document.getElementById('confirm-placement-btn').style.display = 'block';
+        updateDeployButton();
+    } else {
+        // If invalid, clear pending ship and hide button
+        pendingShip = null;
+        renderPlacementBoard(); // Re-render to clear any old pending display
+        document.getElementById('confirm-placement-btn').style.display = 'none';
+        updateDeployButton();
     }
 }
 
-document.getElementById('confirm-placement-btn').addEventListener('click', () => {
-    socket.emit('place_ships', { gameId, ships: PLACED_SHIPS });
-    document.getElementById('placement-msg').innerText = t('waiting_opponent');
-    document.getElementById('confirm-placement-btn').disabled = true;
-    document.getElementById('reset-btn').style.display = 'none'; // Hide reset after confirm
-    document.getElementById('rotate-btn').style.display = 'none';
+function renderPlacementBoard() {
+    const board = document.getElementById('placement-board');
+    // Clear 'ship' class but KEEP grid structure
+    Array.from(board.children).forEach(c => {
+        c.classList.remove('ship', 'pending');
+    });
+
+    // Render CONFIRMED ships
+    PLACED_SHIPS.forEach(ship => {
+        ship.coords.forEach(p => {
+            const idx = p.y * 10 + p.x;
+            board.children[idx].classList.add('ship');
+        });
+    });
+
+    // Render PENDING ship (different style?)
+    if (pendingShip) {
+        pendingShip.coords.forEach(p => {
+            const idx = p.y * 10 + p.x;
+            board.children[idx].classList.add('ship', 'pending'); // 'pending' can correspond to 'preview' style or similar
+        });
+    }
+}
+
+function updateDeployButton() {
+    const btn = document.getElementById('confirm-placement-btn');
+    const totalConfirmed = PLACED_SHIPS.length;
+
+    if (totalConfirmed === 3) {
+        // All ships placed and confirmed, button should be hidden or already triggered deploy
+        btn.style.display = 'none';
+        return;
+    }
+
+    if (pendingShip) {
+        if (totalConfirmed === 2) {
+            btn.innerText = t("deploy_last"); // Final deploy
+        } else {
+            btn.innerText = `${t("confirm_ship")} (${totalConfirmed + 1}/3)`;
+        }
+        btn.disabled = false;
+        btn.style.display = 'block'; // Ensure it's visible when a pending ship exists
+    } else {
+        // No pending ship selected yet for this slot
+        btn.style.display = 'none'; // Hide if no pending ship to confirm
+    }
+}
+
+document.getElementById('rotate-btn').addEventListener('click', () => {
+    rotation = (rotation + 90) % 360;
+    // If we have a pending ship, re-orient it immediately
+    if (pendingShip) {
+        // Try to re-place at same core coords
+        placeShip(pendingShip.core.x, pendingShip.core.y);
+    }
 });
 
 document.getElementById('reset-btn').addEventListener('click', () => {
-    PLACED_SHIPS.length = 0; // Clear array
-    // Remove all 'ship' classes from board
-    document.querySelectorAll('#placement-board .cell').forEach(cell => {
-        cell.classList.remove('ship');
-    });
+    PLACED_SHIPS = [];
+    pendingShip = null;
+    renderPlacementBoard();
+    updateDeployButton();
     document.getElementById('confirm-placement-btn').style.display = 'none';
+});
+
+document.getElementById('confirm-placement-btn').addEventListener('click', () => {
+    if (pendingShip) {
+        PLACED_SHIPS.push(pendingShip);
+        pendingShip = null;
+        renderPlacementBoard();
+
+        if (PLACED_SHIPS.length === 3) {
+            socket.emit('place_ships', { gameId, ships: PLACED_SHIPS });
+            document.getElementById('placement-msg').innerText = t('waiting_opponent');
+            document.getElementById('confirm-placement-btn').style.display = 'none';
+            document.getElementById('reset-btn').style.display = 'none';
+            document.getElementById('rotate-btn').style.display = 'none';
+        } else {
+            updateDeployButton();
+            document.getElementById('confirm-placement-btn').style.display = 'none';
+        }
+    }
 });
 
 // Gameplay Logic
