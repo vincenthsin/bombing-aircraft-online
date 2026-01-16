@@ -212,6 +212,42 @@ h3 {
     border: 1px dashed var(--text-color);
 }
 
+/* Enemy Radar Locked State (Shutdown Effect) */
+#enemy-board.locked {
+    opacity: 0.4;
+    filter: blur(2px);
+    transition: opacity 0.3s ease, filter 0.3s ease;
+    position: relative;
+}
+
+#enemy-board.locked::after {
+    content: "⚠ RADAR OFFLINE ⚠";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: var(--neon-red);
+    text-shadow: 0 0 10px var(--neon-red);
+    pointer-events: none;
+    z-index: 10;
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+
+    0%,
+    100% {
+        opacity: 0.6;
+    }
+
+    50% {
+        opacity: 1;
+    }
+}
+
+
 /* HUD */
 .hud {
     display: flex;

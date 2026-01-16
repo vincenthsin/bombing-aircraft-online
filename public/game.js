@@ -417,10 +417,12 @@ function updateTurnUI(isMyTurn) {
         turnDisplay.innerText = t('your_turn');
         turnDisplay.classList.add('my-turn');
         enemyBoard.classList.remove('locked');
+        enemyBoard.style.pointerEvents = 'auto'; // Enable clicking
     } else {
         turnDisplay.innerText = t('enemy_turn');
         turnDisplay.classList.remove('my-turn');
         enemyBoard.classList.add('locked');
+        enemyBoard.style.pointerEvents = 'none'; // Disable clicking completely
     }
 }
 
