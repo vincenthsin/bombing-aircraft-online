@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bombing-aircraft-v1';
+const CACHE_NAME = 'bombing-aircraft-v2';
 const urlsToCache = [
     '/',
     '/index.html',
@@ -17,6 +17,13 @@ self.addEventListener('install', (event) => {
             })
     );
     self.skipWaiting();
+});
+
+// Listen for SKIP_WAITING message
+self.addEventListener('message', (event) => {
+    if (event.data && event.data.type === 'SKIP_WAITING') {
+        self.skipWaiting();
+    }
 });
 
 // Activate event - clean up old caches
