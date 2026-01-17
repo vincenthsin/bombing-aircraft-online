@@ -2,6 +2,7 @@ const express = require('express');
 const http = require('http');
 const { Server } = require("socket.io");
 const path = require('path');
+const crypto = require('crypto');
 
 const app = express();
 const server = http.createServer(app);
@@ -13,6 +14,7 @@ app.use(express.json());
 
 // Admin Configuration
 const ADMIN_PASSWORD = 'admin123'; // Change this in production!
+const adminSessions = new Set(); // Store active admin session tokens
 
 // Admin Page Route
 app.get('/admin', (req, res) => {
@@ -36,10 +38,29 @@ const serverStats = {
 app.post('/api/admin/auth', (req, res) => {
     const { password } = req.body;
     if (password === ADMIN_PASSWORD) {
-        res.json({ success: true, message: 'Authenticated' });
+        const token = crypto.randomBytes(32).toString('hex');
+        adminSessions.add(token);
+        res.json({ success: true, message: 'Authenticated', token });
     } else {
         res.status(401).json({ success: false, message: 'Invalid password' });
     }
+});
+
+app.post('/api/admin/verify', (req, res) => {
+    const { token } = req.body;
+    if (token && adminSessions.has(token)) {
+        res.json({ success: true });
+    } else {
+        res.status(401).json({ success: false });
+    }
+});
+
+app.post('/api/admin/logout', (req, res) => {
+    const { token } = req.body;
+    if (token) {
+        adminSessions.delete(token);
+    }
+    res.json({ success: true });
 });
 
 app.get('/api/admin/stats', (req, res) => {

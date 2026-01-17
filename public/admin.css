@@ -59,10 +59,13 @@ body::before {
 /* Authentication Screen */
 #auth-screen {
     min-height: 100vh;
-    display: flex;
     align-items: center;
     justify-content: center;
     padding: 20px;
+}
+
+#auth-screen.active {
+    display: flex;
 }
 
 .auth-container {

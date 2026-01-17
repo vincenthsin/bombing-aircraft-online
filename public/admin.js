@@ -3,6 +3,8 @@ let socket = null;
 let isAuthenticated = false;
 let statsInterval = null;
 
+const SESSION_KEY = 'admin_session_token';
+
 // DOM Elements
 const authScreen = document.getElementById('auth-screen');
 const dashboardScreen = document.getElementById('dashboard-screen');
@@ -27,6 +29,41 @@ const usersTbody = document.getElementById('users-tbody');
 const gamesTbody = document.getElementById('games-tbody');
 const eventLog = document.getElementById('event-log');
 
+// Check for existing session on page load
+async function checkExistingSession() {
+    const token = sessionStorage.getItem(SESSION_KEY);
+    if (!token) return false;
+
+    try {
+        const response = await fetch('/api/admin/verify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token })
+        });
+
+        if (response.ok) {
+            return true;
+        } else {
+            sessionStorage.removeItem(SESSION_KEY);
+            return false;
+        }
+    } catch (error) {
+        console.error('Session verification error:', error);
+        return false;
+    }
+}
+
+// Initialize on page load
+(async function init() {
+    const hasValidSession = await checkExistingSession();
+    if (hasValidSession) {
+        isAuthenticated = true;
+        authScreen.classList.remove('active');
+        dashboardScreen.classList.add('active');
+        initializeDashboard();
+    }
+})();
+
 // Authentication
 authForm.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -45,6 +82,7 @@ authForm.addEventListener('submit', async (e) => {
 
         if (data.success) {
             isAuthenticated = true;
+            sessionStorage.setItem(SESSION_KEY, data.token);
             authScreen.classList.remove('active');
             dashboardScreen.classList.add('active');
             initializeDashboard();
@@ -60,7 +98,23 @@ authForm.addEventListener('submit', async (e) => {
 });
 
 // Logout
-logoutBtn.addEventListener('click', () => {
+logoutBtn.addEventListener('click', async () => {
+    const token = sessionStorage.getItem(SESSION_KEY);
+    
+    // Notify server to invalidate the session
+    if (token) {
+        try {
+            await fetch('/api/admin/logout', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ token })
+            });
+        } catch (error) {
+            console.error('Logout error:', error);
+        }
+    }
+    
+    sessionStorage.removeItem(SESSION_KEY);
     isAuthenticated = false;
     dashboardScreen.classList.remove('active');
     authScreen.classList.add('active');
