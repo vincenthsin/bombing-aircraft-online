@@ -7,24 +7,142 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-// Serve static files from 'public' directory
+// Middleware
 app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.json());
+
+// Admin Configuration
+const ADMIN_PASSWORD = 'admin123'; // Change this in production!
+
+// Admin Page Route
+app.get('/admin', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'admin.html'));
+});
 
 // Game State
-const players = {}; // socket.id -> { id, board: [], ships: [], ready: false }
-const games = {};   // gameId -> { player1Id, player2Id, turn: player1Id, status: 'waiting'|'playing'|'finished' }
+const players = {}; // socket.id -> { id, board: [], ships: [], ready: false, connectedAt: timestamp, username: string }
+const games = {};   // gameId -> { player1Id, player2Id, turn: player1Id, status: 'waiting'|'playing'|'finished', startedAt: timestamp }
 let queue = [];     // [socket.id]
+
+// Server Statistics
+const serverStats = {
+    startTime: Date.now(),
+    totalConnections: 0,
+    peakConcurrentUsers: 0,
+    totalGamesPlayed: 0
+};
+
+// Admin API Routes
+app.post('/api/admin/auth', (req, res) => {
+    const { password } = req.body;
+    if (password === ADMIN_PASSWORD) {
+        res.json({ success: true, message: 'Authenticated' });
+    } else {
+        res.status(401).json({ success: false, message: 'Invalid password' });
+    }
+});
+
+app.get('/api/admin/stats', (req, res) => {
+    const activeUsers = Object.keys(players).length;
+    const activeGames = Object.values(games).filter(g => g.status !== 'finished').length;
+    const uptime = Date.now() - serverStats.startTime;
+
+    res.json({
+        activeUsers,
+        activeGames,
+        queueLength: queue.length,
+        totalGamesPlayed: serverStats.totalGamesPlayed,
+        totalConnections: serverStats.totalConnections,
+        peakConcurrentUsers: serverStats.peakConcurrentUsers,
+        uptime,
+        serverStartTime: serverStats.startTime
+    });
+});
+
+app.get('/api/admin/users', (req, res) => {
+    const userList = Object.values(players).map(player => {
+        // Find if player is in a game
+        let gameId = null;
+        let gameStatus = null;
+        for (const [gId, game] of Object.entries(games)) {
+            if (game.player1Id === player.id || game.player2Id === player.id) {
+                gameId = gId;
+                gameStatus = game.status;
+                break;
+            }
+        }
+
+        return {
+            id: player.id,
+            connectedAt: player.connectedAt,
+            ready: player.ready,
+            inQueue: queue.includes(player.id),
+            gameId,
+            gameStatus
+        };
+    });
+
+    res.json(userList);
+});
+
+app.get('/api/admin/games', (req, res) => {
+    const gameList = Object.entries(games).map(([gameId, game]) => ({
+        gameId,
+        player1Id: game.player1Id,
+        player2Id: game.player2Id,
+        status: game.status,
+        turn: game.turn,
+        startedAt: game.startedAt,
+        duration: game.startedAt ? Date.now() - game.startedAt : 0
+    }));
+
+    res.json(gameList);
+});
+
+// Admin Socket.IO Namespace
+const adminNamespace = io.of('/admin');
+adminNamespace.on('connection', (socket) => {
+    console.log('Admin connected:', socket.id);
+
+    // Send initial data
+    socket.emit('initial_data', {
+        players: Object.values(players),
+        games: Object.entries(games).map(([id, game]) => ({ ...game, gameId: id })),
+        queue,
+        stats: serverStats
+    });
+});
+
+// Helper function to broadcast to admin
+function notifyAdmin(event, data) {
+    adminNamespace.emit(event, data);
+}
 
 io.on('connection', (socket) => {
     console.log('A user connected:', socket.id);
+
+    // Update statistics
+    serverStats.totalConnections++;
+    const currentUsers = Object.keys(players).length + 1;
+    if (currentUsers > serverStats.peakConcurrentUsers) {
+        serverStats.peakConcurrentUsers = currentUsers;
+    }
 
     // Initialize player state
     players[socket.id] = {
         id: socket.id,
         board: Array(10).fill(null).map(() => Array(10).fill(0)), // 0: empty, 1: ship part, 2: hit, 3: miss
         ships: [], // List of ship coordinates
-        ready: false
+        ready: false,
+        connectedAt: Date.now()
     };
+
+    // Notify admin
+    notifyAdmin('user_connected', {
+        userId: socket.id,
+        connectedAt: players[socket.id].connectedAt,
+        totalUsers: Object.keys(players).length
+    });
 
     socket.on('join_game', () => {
         if (queue.length > 0) {
@@ -35,7 +153,8 @@ io.on('connection', (socket) => {
                 player1Id: opponentId,
                 player2Id: socket.id,
                 turn: opponentId, // Player 1 starts
-                status: 'placing'
+                status: 'placing',
+                startedAt: Date.now()
             };
 
             // Notify both players
@@ -43,9 +162,24 @@ io.on('connection', (socket) => {
             io.to(socket.id).emit('game_start', { gameId, opponent: opponentId, role: 'player2' });
 
             console.log(`Game started: ${gameId}`);
+
+            // Notify admin
+            notifyAdmin('game_created', {
+                gameId,
+                player1Id: opponentId,
+                player2Id: socket.id,
+                status: 'placing'
+            });
         } else {
             queue.push(socket.id);
             socket.emit('waiting', 'Waiting for an opponent...');
+
+            // Notify admin
+            notifyAdmin('queue_updated', {
+                queueLength: queue.length,
+                userId: socket.id,
+                action: 'joined'
+            });
         }
     });
 
@@ -74,6 +208,14 @@ io.on('connection', (socket) => {
             game.status = 'playing';
             io.to(game.player1Id).emit('round_start', { yourTurn: true });
             io.to(game.player2Id).emit('round_start', { yourTurn: false });
+
+            // Notify admin
+            notifyAdmin('game_status_changed', {
+                gameId,
+                status: 'playing',
+                player1Ready: p1.ready,
+                player2Ready: p2.ready
+            });
         } else {
             socket.emit('waiting_opponent_ships', 'Waiting for opponent to place ships...');
         }
@@ -159,13 +301,30 @@ io.on('connection', (socket) => {
 
         if (allDestroyed) {
             game.status = 'finished';
+            serverStats.totalGamesPlayed++;
+
             io.to(socket.id).emit('game_over', { result: 'win', opponentShips: opponent.ships });
             io.to(opponentId).emit('game_over', { result: 'lose', opponentShips: players[socket.id].ships });
+
+            // Notify admin
+            notifyAdmin('game_finished', {
+                gameId,
+                winner: socket.id,
+                loser: opponentId,
+                duration: Date.now() - game.startedAt,
+                totalGamesPlayed: serverStats.totalGamesPlayed
+            });
         } else {
             // Switch Turn
             game.turn = opponentId;
             io.to(opponentId).emit('turn_change', true);
             io.to(socket.id).emit('turn_change', false);
+
+            // Notify admin
+            notifyAdmin('turn_changed', {
+                gameId,
+                currentTurn: opponentId
+            });
         }
     });
 
@@ -174,6 +333,12 @@ io.on('connection', (socket) => {
         delete players[socket.id];
         // Handle game cleanup...
         queue = queue.filter(id => id !== socket.id);
+
+        // Notify admin
+        notifyAdmin('user_disconnected', {
+            userId: socket.id,
+            totalUsers: Object.keys(players).length
+        });
     });
 });
 
