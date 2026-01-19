@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login Test</title>
+</head>
+<body>
+    <h1>Login Test</h1>
+    <div>
+        <input type="text" id="username" placeholder="Username" value="testplayer2"><br>
+        <input type="password" id="password" placeholder="Password" value="password123"><br>
+        <button id="login-btn">Login</button>
+    </div>
+    <div id="result"></div>
+
+    <script>
+        document.getElementById('login-btn').addEventListener('click', async () => {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const resultDiv = document.getElementById('result');
+
+            resultDiv.textContent = 'Logging in...';
+
+            try {
+                const response = await fetch('http://localhost:3000/api/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ username, password }),
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    resultDiv.textContent = 'Login successful! Token: ' + data.token.substring(0, 20) + '...';
+                    localStorage.setItem('test-token', data.token);
+                } else {
+                    resultDiv.textContent = 'Login failed: ' + data.message;
+                }
+            } catch (error) {
+                resultDiv.textContent = 'Network error: ' + error.message;
+            }
+        });
+
+        // Test token verification
+        window.addEventListener('load', async () => {
+            const token = localStorage.getItem('test-token');
+            if (token) {
+                try {
+                    const response = await fetch('http://localhost:3000/api/auth/verify', {
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                        },
+                    });
+
+                    const data = await response.json();
+                    console.log('Token verification:', data);
+                } catch (error) {
+                    console.error('Verification error:', error);
+                }
+            }
+        });
+    </script>
+</body>
+</html>

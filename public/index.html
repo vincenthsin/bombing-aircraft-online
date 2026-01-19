@@ -25,8 +25,75 @@
 
 <body>
     <div id="app">
+        <!-- Login Screen -->
+        <div id="login-screen" class="screen active">
+            <h1 class="glitch-text" data-i18n="title">BOMBING AIRCRAFT</h1>
+            <p data-i18n="subtitle">TACTICAL ONLINE WARFARE</p>
+
+            <!-- Anonymous Play Option -->
+            <div class="anonymous-section">
+                <button id="play-anonymous-btn" class="cyber-btn large" data-i18n="play_as_guest">PLAY AS GUEST</button>
+                <p class="anonymous-note" data-i18n="guest_note">Play without registration - no stats saved</p>
+            </div>
+
+            <div class="divider">
+                <span data-i18n="or_divider">OR</span>
+            </div>
+
+            <!-- Authenticated Play Options -->
+            <div class="auth-section">
+                <div class="auth-tabs">
+                    <button id="login-tab" class="tab-btn active">LOGIN</button>
+                    <button id="register-tab" class="tab-btn">REGISTER</button>
+                </div>
+
+                <div id="login-form" class="auth-form active">
+                    <input type="text" id="login-username" placeholder="Username" class="cyber-input">
+                    <div class="password-input-container">
+                        <input type="password" id="login-password" placeholder="Password" class="cyber-input">
+                        <button type="button" id="login-password-toggle" class="password-toggle">👁️</button>
+                    </div>
+                    <div class="form-options">
+                        <label class="checkbox-container">
+                            <input type="checkbox" id="remember-me">
+                            <span class="checkmark"></span>
+                            <span data-i18n="remember_me">Remember me</span>
+                        </label>
+                    </div>
+                    <button id="login-btn" class="cyber-btn">LOGIN</button>
+                    <div class="auth-links">
+                        <a href="#" id="forgot-password-link" class="auth-link" data-i18n="forgot_password">Forgot password?</a>
+                    </div>
+                    <p id="login-msg" class="auth-msg"></p>
+                </div>
+
+                <div id="register-form" class="auth-form">
+                    <input type="text" id="register-username" placeholder="Username" class="cyber-input">
+                    <input type="email" id="register-email" placeholder="Email" class="cyber-input">
+                    <div class="password-input-container">
+                        <input type="password" id="register-password" placeholder="Password" class="cyber-input">
+                        <button type="button" id="register-password-toggle" class="password-toggle">👁️</button>
+                    </div>
+                    <div class="password-input-container">
+                        <input type="password" id="register-confirm-password" placeholder="Confirm Password" class="cyber-input">
+                        <button type="button" id="register-confirm-password-toggle" class="password-toggle">👁️</button>
+                    </div>
+                    <button id="register-btn" class="cyber-btn">REGISTER</button>
+                    <p id="register-msg" class="auth-msg"></p>
+                </div>
+            </div>
+        </div>
+
         <!-- Login / Lobby Screen -->
-        <div id="lobby-screen" class="screen active">
+        <div id="lobby-screen" class="screen">
+            <div class="user-info" id="user-info-section">
+                <span id="user-greeting">Welcome, Player!</span>
+                <div class="user-actions">
+                    <button id="logout-btn" class="cyber-btn secondary small" style="display: none;">LOGOUT</button>
+                    <button id="profile-btn" class="cyber-btn secondary small" style="display: none;">PROFILE</button>
+                    <button id="login-prompt-btn" class="cyber-btn secondary small" style="display: none;" data-i18n="sign_up">SIGN UP</button>
+                </div>
+            </div>
             <h1 class="glitch-text" data-i18n="title">BOMBING AIRCRAFT</h1>
             <p data-i18n="subtitle">TACTICAL ONLINE WARFARE</p>
             <button id="join-btn" class="cyber-btn" data-i18n="find_match">FIND MATCH</button>
@@ -78,6 +145,55 @@
             <div class="controls">
                 <button id="review-btn" class="cyber-btn secondary" data-i18n="review">REVIEW BATTLEFIELD</button>
                 <button onclick="location.reload()" class="cyber-btn" data-i18n="return_base">RETURN TO BASE</button>
+            </div>
+        </div>
+
+        <!-- Profile/History Screen -->
+        <div id="profile-screen" class="screen">
+            <div class="user-info">
+                <span id="profile-user-greeting">Welcome, Player!</span>
+                <button id="profile-back-btn" class="cyber-btn secondary small">BACK TO LOBBY</button>
+            </div>
+            <h2>PLAYER PROFILE</h2>
+
+            <div class="profile-content">
+                <div class="stats-section">
+                    <h3>GAME STATISTICS</h3>
+                    <div class="stats-grid">
+                        <div class="stat-item">
+                            <span class="stat-label">Games Played:</span>
+                            <span class="stat-value" id="stat-games-played">0</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Games Won:</span>
+                            <span class="stat-value" id="stat-games-won">0</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Games Lost:</span>
+                            <span class="stat-value" id="stat-games-lost">0</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Win Rate:</span>
+                            <span class="stat-value" id="stat-win-rate">0%</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Total Shots:</span>
+                            <span class="stat-value" id="stat-total-shots">0</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Accuracy:</span>
+                            <span class="stat-value" id="stat-accuracy">0%</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="history-section">
+                    <h3>RECENT GAMES</h3>
+                    <div id="game-history" class="history-list">
+                        <p class="no-history">No games played yet.</p>
+                    </div>
+                    <button id="load-more-history" class="cyber-btn secondary" style="display: none;">LOAD MORE</button>
+                </div>
             </div>
         </div>
     </div>

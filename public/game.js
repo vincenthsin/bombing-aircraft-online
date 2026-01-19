@@ -1,3 +1,9 @@
+// State management for authentication
+let currentUser = null;
+let authToken = localStorage.getItem('authToken');
+let isAnonymous = false;
+let socketConnected = false;
+
 // Register Service Worker for PWA
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
@@ -39,6 +45,106 @@ if ('serviceWorker' in navigator) {
 
 const socket = io();
 
+// Socket event handlers
+socket.on('connect', () => {
+    console.log('Socket connected');
+    socketConnected = true;
+});
+
+socket.on('disconnect', () => {
+    console.log('Socket disconnected');
+    socketConnected = false;
+});
+
+socket.on('authenticated', (data) => {
+    console.log('Socket authenticated:', data.user.username);
+});
+
+socket.on('authentication_error', (error) => {
+    console.error('Socket authentication error:', error.message);
+    logout();
+});
+
+// Authentication functions
+async function login(username, password) {
+    try {
+        const response = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ username, password }),
+        });
+
+        const data = await response.json();
+        if (data.success) {
+            authToken = data.token;
+            currentUser = data.user;
+            localStorage.setItem('authToken', authToken);
+            return { success: true };
+        } else {
+            return { success: false, message: data.message };
+        }
+    } catch (error) {
+        return { success: false, message: 'Network error: ' + error.message };
+    }
+}
+
+async function register(username, email, password) {
+    try {
+        const response = await fetch('/api/auth/register', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ username, email, password }),
+        });
+
+        const data = await response.json();
+        return data;
+    } catch (error) {
+        return { success: false, message: 'Network error' };
+    }
+}
+
+async function verifyAuth() {
+    if (!authToken) return false;
+
+    try {
+        const response = await fetch('/api/auth/verify', {
+            headers: {
+                'Authorization': `Bearer ${authToken}`,
+            },
+        });
+
+        const data = await response.json();
+        if (data.success) {
+            currentUser = data.user;
+            return true;
+        } else {
+            logout();
+            return false;
+        }
+    } catch (error) {
+        logout();
+        return false;
+    }
+}
+
+function logout() {
+    authToken = null;
+    currentUser = null;
+    localStorage.removeItem('authToken');
+    showScreen('login');
+}
+
+// Socket authentication
+function authenticateSocket() {
+    if (authToken) {
+        socket.emit('authenticate', authToken);
+    }
+}
+
 // Localization
 const TRANSLATIONS = {
     en: {
@@ -71,7 +177,14 @@ const TRANSLATIONS = {
         review: "REVIEW BATTLEFIELD",
         leave_game: "LEAVE GAME",
         confirm_ship: "CONFIRM SHIP",
-        deploy_last: "DEPLOY SQUADRON"
+        deploy_last: "DEPLOY SQUADRON",
+        play_as_guest: "PLAY AS GUEST",
+        guest_note: "Play without registration - no stats saved",
+        or_divider: "OR",
+        sign_up: "SIGN UP",
+        login: "LOGIN",
+        remember_me: "Remember me",
+        forgot_password: "Forgot password?"
     },
     zh: {
         title: "炸飞机 OL",
@@ -103,7 +216,14 @@ const TRANSLATIONS = {
         review: "查看战场",
         leave_game: "离开游戏",
         confirm_ship: "确认战机",
-        deploy_last: "部署编队"
+        deploy_last: "部署编队",
+        play_as_guest: "游客模式",
+        guest_note: "无需注册即可游玩 - 不会保存战绩",
+        or_divider: "或",
+        sign_up: "注册",
+        login: "登录",
+        remember_me: "记住我",
+        forgot_password: "忘记密码？"
     }
 };
 
@@ -150,23 +270,191 @@ const SHIP_SHAPE = [
     { x: -1, y: 2 }, { x: 0, y: 2 }, { x: 1, y: 2 } // Tail
 ]; // Total 10 cells
 
-// DOM Elements
-const screens = {
-    lobby: document.getElementById('lobby-screen'),
-    placement: document.getElementById('placement-screen'),
-    game: document.getElementById('game-screen'),
-    result: document.getElementById('result-screen')
-};
+// DOM Elements - initialized lazily
+let screens = {};
+
+function getScreens() {
+    if (Object.keys(screens).length === 0) {
+        screens = {
+            login: document.getElementById('login-screen'),
+            lobby: document.getElementById('lobby-screen'),
+            placement: document.getElementById('placement-screen'),
+            game: document.getElementById('game-screen'),
+            result: document.getElementById('result-screen'),
+            profile: document.getElementById('profile-screen')
+        };
+    }
+    return screens;
+}
 
 function showScreen(name) {
-    Object.values(screens).forEach(s => s.classList.remove('active'));
-    screens[name].classList.add('active');
+    const screenElements = getScreens();
+
+    if (!screenElements[name]) {
+        console.error('Screen not found:', name);
+        return;
+    }
+
+    Object.values(screenElements).forEach(s => {
+        if (s) s.classList.remove('active');
+    });
+    screenElements[name].classList.add('active');
 }
+
+// Anonymous play handler
+document.getElementById('play-anonymous-btn').addEventListener('click', () => {
+    isAnonymous = true;
+    currentUser = null;
+    authToken = null;
+    updateUserDisplay();
+    showScreen('lobby');
+});
 
 // Lobby Logic
 document.getElementById('join-btn').addEventListener('click', () => {
-    socket.emit('join_game');
+    // Determine if this should be an anonymous game based on current user state
+    const shouldPlayAnonymous = isAnonymous || (!currentUser && !authToken);
+    if (!socketConnected) {
+        document.getElementById('status-msg').innerText = 'Connecting... Please wait.';
+        return;
+    }
+
+    socket.emit('join_game', { anonymous: shouldPlayAnonymous });
     document.getElementById('status-msg').innerText = t('searching');
+});
+
+document.getElementById('logout-btn').addEventListener('click', () => {
+    logout();
+});
+
+document.getElementById('profile-btn').addEventListener('click', () => {
+    loadProfile();
+    showScreen('profile');
+});
+
+// Authentication form handlers
+document.getElementById('login-tab').addEventListener('click', () => {
+    document.getElementById('login-tab').classList.add('active');
+    document.getElementById('register-tab').classList.remove('active');
+    document.getElementById('login-form').classList.add('active');
+    document.getElementById('register-form').classList.remove('active');
+    // Clear any messages when switching tabs
+    document.getElementById('login-msg').textContent = '';
+    document.getElementById('register-msg').textContent = '';
+});
+
+document.getElementById('register-tab').addEventListener('click', () => {
+    document.getElementById('register-tab').classList.remove('active');
+    document.getElementById('login-tab').classList.remove('active');
+    document.getElementById('register-tab').classList.add('active');
+    document.getElementById('login-form').classList.remove('active');
+    document.getElementById('register-form').classList.add('active');
+    // Clear any messages when switching tabs
+    document.getElementById('login-msg').textContent = '';
+    document.getElementById('register-msg').textContent = '';
+});
+
+document.getElementById('login-btn').addEventListener('click', async () => {
+    const username = document.getElementById('login-username').value.trim();
+    const password = document.getElementById('login-password').value;
+    const rememberMe = document.getElementById('remember-me').checked;
+    const msgEl = document.getElementById('login-msg');
+
+
+    if (!username || !password) {
+        msgEl.textContent = 'Please fill in all fields';
+        msgEl.style.color = 'var(--neon-red)';
+        return;
+    }
+
+    msgEl.textContent = 'Logging in...';
+    msgEl.style.color = 'var(--text-color)';
+
+    const result = await login(username, password);
+
+    if (result.success) {
+        // Handle remember me functionality
+        if (rememberMe) {
+            // Token is already stored in localStorage by the login function
+        }
+
+        msgEl.textContent = 'Login successful! Welcome back.';
+        msgEl.style.color = 'var(--neon-green)';
+
+        showScreen('lobby');
+        updateUserDisplay();
+    } else {
+        msgEl.textContent = result.message;
+        msgEl.style.color = 'var(--neon-red)';
+    }
+});
+
+document.getElementById('register-btn').addEventListener('click', async () => {
+    const username = document.getElementById('register-username').value;
+    const email = document.getElementById('register-email').value;
+    const password = document.getElementById('register-password').value;
+    const confirmPassword = document.getElementById('register-confirm-password').value;
+    const msgEl = document.getElementById('register-msg');
+
+    if (!username || !email || !password || !confirmPassword) {
+        msgEl.textContent = 'Please fill in all fields';
+        return;
+    }
+
+    if (password !== confirmPassword) {
+        msgEl.textContent = 'Passwords do not match';
+        return;
+    }
+
+    if (password.length < 6) {
+        msgEl.textContent = 'Password must be at least 6 characters';
+        return;
+    }
+
+    msgEl.textContent = 'Registering...';
+    const result = await register(username, email, password);
+
+    if (result.success) {
+        msgEl.textContent = 'Registration successful! Switching to login...';
+        msgEl.style.color = 'var(--neon-green)';
+
+        setTimeout(() => {
+            // Switch to login tab
+            document.getElementById('login-tab').click();
+            document.getElementById('login-username').value = username;
+            document.getElementById('register-msg').textContent = '';
+        }, 1500);
+    } else {
+        msgEl.textContent = result.message;
+        msgEl.style.color = 'var(--neon-red)';
+    }
+});
+
+// Password toggle functionality
+document.getElementById('login-password-toggle').addEventListener('click', function() {
+    const passwordInput = document.getElementById('login-password');
+    const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+    passwordInput.setAttribute('type', type);
+    this.textContent = type === 'password' ? '👁️' : '🙈';
+});
+
+document.getElementById('register-password-toggle').addEventListener('click', function() {
+    const passwordInput = document.getElementById('register-password');
+    const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+    passwordInput.setAttribute('type', type);
+    this.textContent = type === 'password' ? '👁️' : '🙈';
+});
+
+document.getElementById('register-confirm-password-toggle').addEventListener('click', function() {
+    const passwordInput = document.getElementById('register-confirm-password');
+    const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+    passwordInput.setAttribute('type', type);
+    this.textContent = type === 'password' ? '👁️' : '🙈';
+});
+
+document.getElementById('forgot-password-link').addEventListener('click', function(e) {
+    e.preventDefault();
+    alert('Password reset functionality is not implemented yet. Please contact support or create a new account.');
 });
 
 socket.on('waiting', (msg) => {
@@ -526,3 +814,131 @@ document.getElementById('leave-btn').addEventListener('click', () => {
 socket.on('error', (msg) => {
     alert(msg);
 });
+
+// Profile and user display functions
+function updateUserDisplay() {
+    const userInfoSection = document.getElementById('user-info-section');
+    const logoutBtn = document.getElementById('logout-btn');
+    const profileBtn = document.getElementById('profile-btn');
+    const loginPromptBtn = document.getElementById('login-prompt-btn');
+
+    if (currentUser) {
+        // Authenticated user
+        document.getElementById('user-greeting').textContent = `Welcome, ${currentUser.username}!`;
+        document.getElementById('profile-user-greeting').textContent = `Welcome, ${currentUser.username}!`;
+        logoutBtn.style.display = 'inline-block';
+        profileBtn.style.display = 'inline-block';
+        loginPromptBtn.style.display = 'none';
+    } else if (isAnonymous) {
+        // Anonymous user
+        document.getElementById('user-greeting').textContent = 'Playing as Guest';
+        logoutBtn.style.display = 'none';
+        profileBtn.style.display = 'none';
+        loginPromptBtn.style.display = 'inline-block';
+        loginPromptBtn.textContent = t('sign_up');
+    } else {
+        // Not logged in (shouldn't reach here in normal flow)
+        document.getElementById('user-greeting').textContent = 'Welcome!';
+        logoutBtn.style.display = 'none';
+        profileBtn.style.display = 'none';
+        loginPromptBtn.style.display = 'inline-block';
+        loginPromptBtn.textContent = t('login');
+    }
+}
+
+async function loadProfile() {
+    if (!authToken) return;
+
+    try {
+        // Load user stats
+        const profileResponse = await fetch('/api/user/profile', {
+            headers: {
+                'Authorization': `Bearer ${authToken}`,
+            },
+        });
+
+        const profileData = await profileResponse.json();
+        if (profileData.success) {
+            const stats = profileData.user.stats;
+            document.getElementById('stat-games-played').textContent = stats.gamesPlayed;
+            document.getElementById('stat-games-won').textContent = stats.gamesWon;
+            document.getElementById('stat-games-lost').textContent = stats.gamesLost;
+            document.getElementById('stat-win-rate').textContent = `${stats.winRate.toFixed(1)}%`;
+            document.getElementById('stat-total-shots').textContent = stats.totalShots;
+            const accuracy = stats.totalShots > 0 ? ((stats.hits / stats.totalShots) * 100).toFixed(1) : 0;
+            document.getElementById('stat-accuracy').textContent = `${accuracy}%`;
+        }
+
+        // Load recent games
+        const historyResponse = await fetch('/api/user/recent-games?limit=10', {
+            headers: {
+                'Authorization': `Bearer ${authToken}`,
+            },
+        });
+
+        const historyData = await historyResponse.json();
+        if (historyData.success) {
+            displayGameHistory(historyData.games);
+        }
+    } catch (error) {
+        console.error('Error loading profile:', error);
+    }
+}
+
+function displayGameHistory(games) {
+    const historyEl = document.getElementById('game-history');
+
+    if (!games || games.length === 0) {
+        historyEl.innerHTML = '<p class="no-history">No games played yet.</p>';
+        return;
+    }
+
+    historyEl.innerHTML = games.map(game => {
+        const date = new Date(game.started_at).toLocaleDateString();
+        const duration = game.duration_seconds ? `${Math.floor(game.duration_seconds / 60)}:${(game.duration_seconds % 60).toString().padStart(2, '0')}` : 'Ongoing';
+        const resultClass = game.result === 'win' ? 'win' : game.result === 'lose' ? 'loss' : 'ongoing';
+        const opponent = game.result === 'win' ? game.player2_username : game.player1_username;
+
+        return `
+            <div class="history-item">
+                <div>
+                    <div class="history-game-id">${game.game_id}</div>
+                    <div class="history-opponent">vs ${opponent}</div>
+                    <div class="history-date">${date} • ${duration}</div>
+                </div>
+                <div class="history-result ${resultClass}">${game.result}</div>
+            </div>
+        `;
+    }).join('');
+}
+
+document.getElementById('profile-back-btn').addEventListener('click', () => {
+    showScreen('lobby');
+});
+
+document.getElementById('login-prompt-btn').addEventListener('click', () => {
+    showScreen('login');
+});
+
+// Initialize app
+async function initApp() {
+    // Try to verify existing authentication
+    if (authToken) {
+        const isValid = await verifyAuth();
+        if (isValid) {
+            showScreen('lobby');
+            updateUserDisplay();
+            return;
+        } else {
+            // Clear invalid token
+            localStorage.removeItem('authToken');
+            authToken = null;
+        }
+    }
+
+    // Always show login screen first - users must choose anonymous or authenticated play
+    showScreen('login');
+}
+
+// Start the app when DOM is loaded
+document.addEventListener('DOMContentLoaded', initApp);
