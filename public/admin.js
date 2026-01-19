@@ -236,7 +236,7 @@ async function fetchUsers() {
         usersCount.textContent = users.length;
 
         if (users.length === 0) {
-            usersTbody.innerHTML = '<tr class="empty-state"><td colspan="4">No users connected</td></tr>';
+            usersTbody.innerHTML = '<tr class="empty-state"><td colspan="5">No users connected</td></tr>';
             return;
         }
 
@@ -252,6 +252,7 @@ async function fetchUsers() {
                 <tr>
                     <td class="text-truncate" title="${user.id}">${truncateId(user.id)}</td>
                     <td><span class="status-badge ${status}">${status}</span></td>
+                    <td class="text-truncate" title="${user.ip || '-'}">${user.ip || '-'}</td>
                     <td>${formatTime(user.connectedAt)}</td>
                     <td class="text-truncate" title="${user.gameId || '-'}">${user.gameId ? truncateId(user.gameId) : '-'}</td>
                 </tr>
