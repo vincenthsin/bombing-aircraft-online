@@ -1,20 +1,15 @@
 const io = require('socket.io-client');
 const socket = io('http://localhost:3000');
 
+// Import DDD domain objects
+const { domain } = require('./src');
+
 const GAME_ID_PATTERN = /Match Found!/; // Not used directly, but logical context
 let gameId = null;
-let myShips = [];
+let myAircraft = [];
 let myBoard = Array(100).fill(0); // 0: empty, 1: ship
 let enemyBoard = Array(100).fill(0); // 0: unknown, 1: shot
 let isMyTurn = false;
-
-// Ship Shape (10-cell Heavy Bomber)
-const SHIP_SHAPE = [
-    { x: 0, y: -1 }, // Head
-    { x: -2, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 0 }, { x: 1, y: 0 }, { x: 2, y: 0 }, // Wings (5 wide)
-    { x: 0, y: 1 }, // Body
-    { x: -1, y: 2 }, { x: 0, y: 2 }, { x: 1, y: 2 } // Tail
-];
 
 console.log("Simulator starting...");
 
@@ -68,55 +63,61 @@ socket.on('disconnect', () => {
 
 // --- Logic ---
 
-function getShipCoords(cx, cy, rot) {
-    return SHIP_SHAPE.map(p => {
-        let x = p.x, y = p.y;
-
-        // Rotate
-        if (rot === 90) { const temp = x; x = -y; y = temp; }
-        else if (rot === 180) { x = -x; y = -y; }
-        else if (rot === 270) { const temp = x; x = y; y = -temp; }
-
-        return { x: cx + x, y: cy + y };
-    });
-}
-
-function isValidPlacement(shipCoords, placedShips) {
-    // Bounds check
-    if (shipCoords.some(p => p.x < 0 || p.x >= 10 || p.y < 0 || p.y >= 10)) return false;
-
-    // Overlap check
-    for (const ship of placedShips) {
-        for (const p of ship.coords) {
-            if (shipCoords.some(c => c.x === p.x && c.y === p.y)) return false;
-        }
+function isValidAircraftPlacement(position, orientation, existingAircraft = []) {
+    try {
+        // Use the Aircraft class to validate placement
+        return domain.Aircraft.canPlaceAt(position, orientation,
+            existingAircraft.flatMap(aircraft =>
+                aircraft.parts.map(part => part.coordinate)
+            )
+        );
+    } catch (error) {
+        return false;
     }
-    return true;
 }
 
 function placeShips() {
-    console.log("Placing ships...");
-    const ships = [];
+    console.log("Placing aircraft...");
+    const aircraftConfigs = [];
+    const placedAircraft = [];
     let attempts = 0;
 
-    while (ships.length < 3 && attempts < 1000) {
+    while (aircraftConfigs.length < 3 && attempts < 1000) {
         attempts++;
         const x = Math.floor(Math.random() * 10);
         const y = Math.floor(Math.random() * 10);
-        const rot = [0, 90, 180, 270][Math.floor(Math.random() * 4)];
+        const orientation = Math.random() < 0.5 ? 'horizontal' : 'vertical';
 
-        const coords = getShipCoords(x, y, rot);
+        const position = new domain.Coordinate(x, y);
 
-        if (isValidPlacement(coords, ships)) {
-            ships.push({ coords, core: { x, y }, rotation: rot });
+        if (isValidAircraftPlacement(position, orientation, placedAircraft)) {
+            // Create the aircraft to get its parts
+            const aircraft = new domain.Aircraft(`aircraft-${aircraftConfigs.length + 1}`, position, orientation);
+            placedAircraft.push(aircraft);
+
+            // Convert to server format
+            aircraftConfigs.push({
+                position: { x, y },
+                orientation: orientation
+            });
         }
     }
 
-    if (ships.length === 3) {
-        console.log("Ships placed successfully.");
-        socket.emit('place_ships', { gameId, ships });
+    if (aircraftConfigs.length === 3) {
+        console.log("Aircraft placed successfully.");
+        myAircraft = placedAircraft;
+
+        // Update internal board representation
+        placedAircraft.forEach(aircraft => {
+            aircraft.parts.forEach(part => {
+                const idx = part.coordinate.y * 10 + part.coordinate.x;
+                myBoard[idx] = 1; // Mark as occupied
+            });
+        });
+
+        socket.emit('place_ships', { gameId, ships: aircraftConfigs });
     } else {
-        console.error("Failed to place 3 ships.");
+        console.error("Failed to place 3 aircraft.");
     }
 }
 

@@ -136,7 +136,7 @@ initLocalization();
 
 // State
 let myShips = [];
-let rotation = 0; // 0, 90, 180, 270
+let isHorizontal = true; // true = horizontal, false = vertical
 let gameId = null;
 let isMyTurn = false;
 let PLACED_SHIPS = [];
@@ -144,10 +144,10 @@ let pendingShip = null;
 
 // Placement Logic consts
 const SHIP_SHAPE = [
-    { x: 0, y: -1 }, // Head
-    { x: -2, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 0 }, { x: 1, y: 0 }, { x: 2, y: 0 }, // Wings (5 wide)
-    { x: 0, y: 1 }, // Body
-    { x: -1, y: 2 }, { x: 0, y: 2 }, { x: 1, y: 2 } // Tail
+    { x: 0, y: 0 }, // Head
+    { x: -2, y: 1 }, { x: -1, y: 1 }, { x: 0, y: 1 }, { x: 1, y: 1 }, { x: 2, y: 1 }, // Wings (5 wide)
+    { x: 0, y: 2 }, // Body
+    { x: -1, y: 3 }, { x: 0, y: 3 }, { x: 1, y: 3 } // Tail
 ]; // Total 10 cells
 
 // DOM Elements
@@ -250,15 +250,27 @@ document.addEventListener('keydown', (e) => {
 });
 
 function getTransformedShape(rot) {
-    // Basic rotation logic around (0,0)
-    return SHIP_SHAPE.map(p => {
-        let x = p.x;
-        let y = p.y;
-        if (rot === 90) { let temp = x; x = -y; y = temp; }
-        else if (rot === 180) { x = -x; y = -y; }
-        else if (rot === 270) { let temp = x; x = y; y = -temp; }
-        return { x, y };
-    });
+    // Match DDD Aircraft orientation logic
+    // 0 = horizontal (downward), 90/180/270 = vertical (rightward)
+    const isHorizontal = rot === 0;
+
+    if (isHorizontal) {
+        // Horizontal orientation - head at (0,0), extends downward
+        return [
+            { x: 0, y: 0 }, // Head
+            { x: -2, y: 1 }, { x: -1, y: 1 }, { x: 0, y: 1 }, { x: 1, y: 1 }, { x: 2, y: 1 }, // Wings
+            { x: 0, y: 2 }, // Body
+            { x: -1, y: 3 }, { x: 0, y: 3 }, { x: 1, y: 3 } // Tail
+        ];
+    } else {
+        // Vertical orientation - head at (0,0), extends rightward
+        return [
+            { x: 0, y: 0 }, // Head
+            { x: 1, y: -2 }, { x: 1, y: -1 }, { x: 1, y: 0 }, { x: 1, y: 1 }, { x: 1, y: 2 }, // Wings
+            { x: 2, y: 0 }, // Body
+            { x: 3, y: -1 }, { x: 3, y: 0 }, { x: 3, y: 1 } // Tail
+        ];
+    }
 }
 
 function getShipCoords(cx, cy, rot) {
@@ -283,7 +295,7 @@ function previewShip(x, y) {
     if (PLACED_SHIPS.length >= 3) return; // Max 3 confirmed ships
 
     clearPreview();
-    const coords = getShipCoords(x, y, rotation);
+    const coords = getShipCoords(x, y, isHorizontal ? 0 : 90);
     const valid = isValidPlacement(coords);
 
     coords.forEach(p => {
@@ -305,11 +317,11 @@ function clearPreview() {
 function placeShip(x, y) {
     if (PLACED_SHIPS.length >= 3) return; // Max 3 confirmed
 
-    const coords = getShipCoords(x, y, rotation);
+    const coords = getShipCoords(x, y, isHorizontal ? 0 : 90);
 
     if (isValidPlacement(coords)) {
         // Set as PENDING, don't confirm yet
-        pendingShip = { coords, core: { x, y }, rotation };
+        pendingShip = { coords, core: { x, y }, orientation: isHorizontal ? 'horizontal' : 'vertical' };
         renderPlacementBoard();
 
         // Show confirm button
@@ -373,7 +385,7 @@ function updateDeployButton() {
 }
 
 document.getElementById('rotate-btn').addEventListener('click', () => {
-    rotation = (rotation + 90) % 360;
+    isHorizontal = !isHorizontal;
     // If we have a pending ship, re-orient it immediately
     if (pendingShip) {
         // Try to re-place at same core coords
@@ -396,7 +408,12 @@ document.getElementById('confirm-placement-btn').addEventListener('click', () =>
         renderPlacementBoard();
 
         if (PLACED_SHIPS.length === 3) {
-            socket.emit('place_ships', { gameId, ships: PLACED_SHIPS });
+            // Convert to new format for server
+            const shipsForServer = PLACED_SHIPS.map(ship => ({
+                position: ship.core,
+                orientation: ship.orientation
+            }));
+            socket.emit('place_ships', { gameId, ships: shipsForServer });
             document.getElementById('placement-msg').innerText = t('waiting_opponent');
             document.getElementById('confirm-placement-btn').style.display = 'none';
             document.getElementById('reset-btn').style.display = 'none';

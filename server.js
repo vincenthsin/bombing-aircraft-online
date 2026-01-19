@@ -4,6 +4,9 @@ const { Server } = require("socket.io");
 const path = require('path');
 const crypto = require('crypto');
 
+// Import DDD architecture
+const { infrastructure } = require('./src');
+
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
@@ -22,7 +25,8 @@ app.get('/admin', (req, res) => {
 });
 
 // Game State
-const players = {}; // socket.id -> { id, board: [], ships: [], ready: false, connectedAt: timestamp, username: string }
+const playerRepository = new infrastructure.Repositories.InMemoryPlayerRepository();
+const playerApplicationService = new infrastructure.Services.PlayerApplicationService(playerRepository);
 const games = {};   // gameId -> { player1Id, player2Id, turn: player1Id, status: 'waiting'|'playing'|'finished', startedAt: timestamp }
 let queue = [];     // [socket.id]
 
@@ -63,8 +67,9 @@ app.post('/api/admin/logout', (req, res) => {
     res.json({ success: true });
 });
 
-app.get('/api/admin/stats', (req, res) => {
-    const activeUsers = Object.keys(players).length;
+app.get('/api/admin/stats', async (req, res) => {
+    const allPlayers = await playerApplicationService.getAllPlayers();
+    const activeUsers = allPlayers.length;
     const activeGames = Object.values(games).filter(g => g.status !== 'finished').length;
     const uptime = Date.now() - serverStats.startTime;
 
@@ -80,13 +85,14 @@ app.get('/api/admin/stats', (req, res) => {
     });
 });
 
-app.get('/api/admin/users', (req, res) => {
-    const userList = Object.values(players).map(player => {
+app.get('/api/admin/users', async (req, res) => {
+    const allPlayers = await playerApplicationService.getAllPlayers();
+    const userList = allPlayers.map(player => {
         // Find if player is in a game
         let gameId = null;
         let gameStatus = null;
         for (const [gId, game] of Object.entries(games)) {
-            if (game.player1Id === player.id || game.player2Id === player.id) {
+            if (game.player1Id === player.playerId || game.player2Id === player.playerId) {
                 gameId = gId;
                 gameStatus = game.status;
                 break;
@@ -94,10 +100,10 @@ app.get('/api/admin/users', (req, res) => {
         }
 
         return {
-            id: player.id,
+            id: player.playerId,
             connectedAt: player.connectedAt,
             ready: player.ready,
-            inQueue: queue.includes(player.id),
+            inQueue: queue.includes(player.playerId),
             gameId,
             gameStatus
         };
@@ -122,12 +128,13 @@ app.get('/api/admin/games', (req, res) => {
 
 // Admin Socket.IO Namespace
 const adminNamespace = io.of('/admin');
-adminNamespace.on('connection', (socket) => {
+adminNamespace.on('connection', async (socket) => {
     console.log('Admin connected:', socket.id);
 
     // Send initial data
+    const allPlayers = await playerApplicationService.getAllPlayers();
     socket.emit('initial_data', {
-        players: Object.values(players),
+        players: allPlayers,
         games: Object.entries(games).map(([id, game]) => ({ ...game, gameId: id })),
         queue,
         stats: serverStats
@@ -139,30 +146,28 @@ function notifyAdmin(event, data) {
     adminNamespace.emit(event, data);
 }
 
-io.on('connection', (socket) => {
+io.on('connection', async (socket) => {
     console.log('A user connected:', socket.id);
 
     // Update statistics
     serverStats.totalConnections++;
-    const currentUsers = Object.keys(players).length + 1;
+    const allPlayers = await playerApplicationService.getAllPlayers();
+    const currentUsers = allPlayers.length + 1;
     if (currentUsers > serverStats.peakConcurrentUsers) {
         serverStats.peakConcurrentUsers = currentUsers;
     }
 
-    // Initialize player state
-    players[socket.id] = {
-        id: socket.id,
-        board: Array(10).fill(null).map(() => Array(10).fill(0)), // 0: empty, 1: ship part, 2: hit, 3: miss
-        ships: [], // List of ship coordinates
-        ready: false,
-        connectedAt: Date.now()
-    };
+    // Create player using DDD
+    await playerApplicationService.createPlayer(socket.id);
+
+    // Get the created player
+    const player = await playerApplicationService.getPlayer(socket.id);
 
     // Notify admin
     notifyAdmin('user_connected', {
         userId: socket.id,
-        connectedAt: players[socket.id].connectedAt,
-        totalUsers: Object.keys(players).length
+        connectedAt: player.connectedAt,
+        totalUsers: currentUsers
     });
 
     socket.on('join_game', () => {
@@ -204,45 +209,59 @@ io.on('connection', (socket) => {
         }
     });
 
-    socket.on('place_ships', ({ gameId, ships }) => {
+    socket.on('place_ships', async ({ gameId, ships }) => {
         const game = games[gameId];
-        if (!game) return;
+        if (!game) {
+            console.log(`Game ${gameId} not found`);
+            return;
+        }
 
-        // Validate and store ships
-        players[socket.id].ships = ships;
-        players[socket.id].ready = true;
-
-        // Update board state with ships (internally)
-        // In a real game, we'd validate these positions rigorously
-        ships.forEach(ship => {
-            ship.coords.forEach(({ x, y }) => {
-                if (x >= 0 && x < 10 && y >= 0 && y < 10) {
-                    players[socket.id].board[y][x] = 1; // 1 = Ship present
+        try {
+            // Convert ships to new format if needed
+            const aircraftConfigs = ships.map((ship, index) => {
+                // Check if it's the old format (has coords, core, rotation)
+                if (ship.coords && ship.core && typeof ship.rotation === 'number') {
+                    // Convert old format to new format
+                    const orientation = ship.rotation === 0 || ship.rotation === 180 ? 'horizontal' : 'vertical';
+                    return {
+                        position: ship.core, // Head position
+                        orientation: orientation
+                    };
+                } else {
+                    // Already in new format
+                    return ship;
                 }
             });
-        });
 
-        const p1 = players[game.player1Id];
-        const p2 = players[game.player2Id];
+            // Use DDD to place ships
+            await playerApplicationService.placeShips(socket.id, aircraftConfigs);
 
-        if (p1.ready && p2.ready) {
-            game.status = 'playing';
-            io.to(game.player1Id).emit('round_start', { yourTurn: true });
-            io.to(game.player2Id).emit('round_start', { yourTurn: false });
+            // Check if both players are ready
+            const p1 = await playerApplicationService.getPlayer(game.player1Id);
+            const p2 = await playerApplicationService.getPlayer(game.player2Id);
 
-            // Notify admin
-            notifyAdmin('game_status_changed', {
-                gameId,
-                status: 'playing',
-                player1Ready: p1.ready,
-                player2Ready: p2.ready
-            });
-        } else {
-            socket.emit('waiting_opponent_ships', 'Waiting for opponent to place ships...');
+            if (p1.ready && p2.ready) {
+                game.status = 'playing';
+                io.to(game.player1Id).emit('round_start', { yourTurn: true });
+                io.to(game.player2Id).emit('round_start', { yourTurn: false });
+
+                // Notify admin
+                notifyAdmin('game_status_changed', {
+                    gameId,
+                    status: 'playing',
+                    player1Ready: p1.ready,
+                    player2Ready: p2.ready
+                });
+            } else {
+                socket.emit('waiting_opponent_ships', 'Waiting for opponent to place ships...');
+            }
+        } catch (error) {
+            console.error('Error placing ships:', error);
+            socket.emit('error', 'Invalid ship placement');
         }
     });
 
-    socket.on('shoot', ({ gameId, x, y }) => {
+    socket.on('shoot', async ({ gameId, x, y }) => {
         const game = games[gameId];
         if (!game || game.status !== 'playing') return;
 
@@ -252,113 +271,69 @@ io.on('connection', (socket) => {
         }
 
         const opponentId = (socket.id === game.player1Id) ? game.player2Id : game.player1Id;
-        const opponent = players[opponentId];
 
-        // Check hit or miss
-        let result = 'miss';
-        const targetValue = opponent.board[y][x];
+        try {
+            // Use DDD to process the shot
+            const shotResult = await playerApplicationService.processShot(opponentId, { x, y });
 
-        // 0 = empty, 1 = ship, 2 = hit, 3 = miss, 4 = fatal
-        if (targetValue !== 0 && targetValue !== 1) {
-            // Already shot here
-            return;
-        }
+            // Notify result
+            io.to(socket.id).emit('shot_result', { x, y, result: shotResult.result, isMyShot: true });
+            io.to(opponentId).emit('shot_result', { x, y, result: shotResult.result, isMyShot: false });
 
-        // Find which ship was hit (if any)
-        let hitShip = null;
-        let isHead = false;
+            // Check Win Condition
+            if (shotResult.playerLost) {
+                game.status = 'finished';
+                serverStats.totalGamesPlayed++;
 
-        for (const ship of opponent.ships) {
-            // ship.coords[0] is HEAD
-            if (ship.coords[0].x === x && ship.coords[0].y === y) {
-                hitShip = ship;
-                isHead = true;
-                break;
-            }
-            // Check body
-            for (let i = 1; i < ship.coords.length; i++) {
-                if (ship.coords[i].x === x && ship.coords[i].y === y) {
-                    hitShip = ship;
-                    break;
-                }
-            }
-            if (hitShip) break;
-        }
+                // Get ship data for both players
+                const winnerShips = (await playerApplicationService.getPlayer(socket.id)).aircraft;
+                const loserShips = (await playerApplicationService.getPlayer(opponentId)).aircraft;
 
-        if (hitShip) {
-            if (isHead) {
-                result = 'fatal';
-                opponent.board[y][x] = 4; // Fatal
-                hitShip.destroyed = true; // Mark ship destroyed instantly
+                io.to(socket.id).emit('game_over', { result: 'win', opponentShips: loserShips });
+                io.to(opponentId).emit('game_over', { result: 'lose', opponentShips: winnerShips });
+
+                // Notify admin
+                notifyAdmin('game_finished', {
+                    gameId,
+                    winner: socket.id,
+                    loser: opponentId,
+                    duration: Date.now() - game.startedAt,
+                    totalGamesPlayed: serverStats.totalGamesPlayed
+                });
             } else {
-                result = 'hit';
-                opponent.board[y][x] = 2; // Hit
+                // Switch Turn
+                game.turn = opponentId;
+                io.to(opponentId).emit('turn_change', true);
+                io.to(socket.id).emit('turn_change', false);
 
-                // Check if this normal hit destroyed the ship (all parts hit)
-                let allHit = true;
-                for (const p of hitShip.coords) {
-                    const cellVal = opponent.board[p.y][p.x];
-                    // If any part is NOT hit (val=1) and NOT fatal (val=4) and NOT hit (val=2) -> then it's alive
-                    // Actually we just check if it is 0 or 1. 
-                    // 1 is intact ship part.
-                    if (opponent.board[p.y][p.x] === 1) {
-                        allHit = false;
-                        break;
-                    }
-                }
-                if (allHit) hitShip.destroyed = true;
+                // Notify admin
+                notifyAdmin('turn_changed', {
+                    gameId,
+                    currentTurn: opponentId
+                });
             }
-        } else {
-            result = 'miss';
-            opponent.board[y][x] = 3; // Miss
-        }
-
-        // Notify result
-        io.to(socket.id).emit('shot_result', { x, y, result, isMyShot: true });
-        io.to(opponentId).emit('shot_result', { x, y, result, isMyShot: false });
-
-        // Check Win Condition: Are ALL ships destroyed?
-        const allDestroyed = opponent.ships.every(s => s.destroyed);
-
-        if (allDestroyed) {
-            game.status = 'finished';
-            serverStats.totalGamesPlayed++;
-
-            io.to(socket.id).emit('game_over', { result: 'win', opponentShips: opponent.ships });
-            io.to(opponentId).emit('game_over', { result: 'lose', opponentShips: players[socket.id].ships });
-
-            // Notify admin
-            notifyAdmin('game_finished', {
-                gameId,
-                winner: socket.id,
-                loser: opponentId,
-                duration: Date.now() - game.startedAt,
-                totalGamesPlayed: serverStats.totalGamesPlayed
-            });
-        } else {
-            // Switch Turn
-            game.turn = opponentId;
-            io.to(opponentId).emit('turn_change', true);
-            io.to(socket.id).emit('turn_change', false);
-
-            // Notify admin
-            notifyAdmin('turn_changed', {
-                gameId,
-                currentTurn: opponentId
-            });
+        } catch (error) {
+            console.error('Error processing shot:', error);
+            socket.emit('error', 'Invalid shot');
         }
     });
 
-    socket.on('disconnect', () => {
+    socket.on('disconnect', async () => {
         console.log('User disconnected:', socket.id);
-        delete players[socket.id];
+
+        // Use DDD to disconnect player
+        await playerApplicationService.disconnectPlayer(socket.id);
+
         // Handle game cleanup...
         queue = queue.filter(id => id !== socket.id);
+
+        // Get updated player count
+        const allPlayers = await playerApplicationService.getAllPlayers();
 
         // Notify admin
         notifyAdmin('user_disconnected', {
             userId: socket.id,
-            totalUsers: Object.keys(players).length
+            totalUsers: allPlayers.length
         });
     });
 });
