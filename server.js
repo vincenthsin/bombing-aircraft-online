@@ -307,6 +307,18 @@ function notifyAdmin(event, data) {
     adminNamespace.emit(event, data);
 }
 
+// Helpers to manage player state
+function createEmptyBoard() {
+    return Array(10).fill(null).map(() => Array(10).fill(0));
+}
+
+function resetPlayerState(player) {
+    if (!player) return;
+    player.board = createEmptyBoard();
+    player.ships = [];
+    player.ready = false;
+}
+
 // Normalize client IP to IPv4 when possible
 function extractIPv4(rawIp) {
     if (!rawIp) return null;
@@ -404,7 +416,26 @@ io.on('connection', (socket) => {
         console.log('Allowing join_game - proceeding with game logic');
 
         if (queue.length > 0) {
-            const opponentId = queue.shift();
+            // Pop opponents until we find a live socket entry
+            let opponentId = null;
+            while (queue.length > 0 && !opponentId) {
+                const candidateId = queue.shift();
+                if (players[candidateId]) {
+                    opponentId = candidateId;
+                }
+            }
+
+            if (!opponentId || !players[opponentId]) {
+                // No valid opponent found, re-queue current player
+                if (!queue.includes(socket.id)) queue.push(socket.id);
+                socket.emit('waiting', 'Waiting for an opponent...');
+                return;
+            }
+
+            // Freshen player states for the new match
+            resetPlayerState(player);
+            resetPlayerState(players[opponentId]);
+
             const gameId = `${socket.id}-${opponentId}`;
 
             // Create game session in database only if both players are authenticated
@@ -486,16 +517,22 @@ io.on('connection', (socket) => {
         const game = games[gameId];
         if (!game) return;
 
+        const currentPlayer = players[socket.id];
+        if (!currentPlayer) {
+            // Player disconnected or state missing
+            return;
+        }
+
         // Validate and store ships
-        players[socket.id].ships = ships;
-        players[socket.id].ready = true;
+        currentPlayer.ships = ships;
+        currentPlayer.ready = true;
 
         // Update board state with ships (internally)
         // In a real game, we'd validate these positions rigorously
         ships.forEach(ship => {
             ship.coords.forEach(({ x, y }) => {
                 if (x >= 0 && x < 10 && y >= 0 && y < 10) {
-                    players[socket.id].board[y][x] = 1; // 1 = Ship present
+                    currentPlayer.board[y][x] = 1; // 1 = Ship present
                 }
             });
         });
@@ -518,6 +555,26 @@ io.on('connection', (socket) => {
 
         const p1 = players[game.player1Id];
         const p2 = players[game.player2Id];
+
+        // If opponent disconnected / missing, clean up and requeue current player
+        if (!p1 || !p2) {
+            delete games[gameId];
+
+            resetPlayerState(currentPlayer);
+            if (!queue.includes(socket.id)) {
+                queue.push(socket.id);
+            }
+
+            socket.emit('waiting', 'Opponent left; re-queued for another match.');
+
+            notifyAdmin('queue_updated', {
+                queueLength: queue.length,
+                userId: socket.id,
+                username: currentPlayer.username || 'Guest',
+                action: 'requeued'
+            });
+            return;
+        }
 
         if (p1.ready && p2.ready) {
             game.status = 'playing';
@@ -547,6 +604,26 @@ io.on('connection', (socket) => {
 
         const opponentId = (socket.id === game.player1Id) ? game.player2Id : game.player1Id;
         const opponent = players[opponentId];
+        if (!opponent) {
+            // Opponent disconnected; end this game and requeue the active player.
+            delete games[gameId];
+
+            const currentPlayer = players[socket.id];
+            resetPlayerState(currentPlayer);
+            if (!queue.includes(socket.id)) {
+                queue.push(socket.id);
+            }
+
+            socket.emit('waiting', 'Opponent disconnected; searching for a new match...');
+
+            notifyAdmin('queue_updated', {
+                queueLength: queue.length,
+                userId: socket.id,
+                username: currentPlayer?.username || 'Guest',
+                action: 'requeued'
+            });
+            return;
+        }
 
         // Check hit or miss
         let result = 'miss';
