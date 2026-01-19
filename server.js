@@ -119,6 +119,7 @@ app.get('/api/admin/users', (req, res) => {
 
         return {
             id: player.id,
+            ip: player.ip,
             connectedAt: player.connectedAt,
             ready: player.ready,
             inQueue: queue.includes(player.id),
@@ -306,8 +307,29 @@ function notifyAdmin(event, data) {
     adminNamespace.emit(event, data);
 }
 
+// Normalize client IP to IPv4 when possible
+function extractIPv4(rawIp) {
+    if (!rawIp) return null;
+    const ip = rawIp.toString().trim();
+    // Handle IPv6-mapped IPv4 addresses like "::ffff:127.0.0.1"
+    if (ip.startsWith('::ffff:')) return ip.substring(7);
+    // If raw looks like IPv6 with embedded IPv4, take last segment
+    const parts = ip.split(':');
+    if (parts.length > 1 && parts[parts.length - 1].includes('.')) {
+        return parts[parts.length - 1];
+    }
+    // Basic IPv4 regex check
+    const ipv4Regex = /^(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}$/;
+    return ipv4Regex.test(ip) ? ip : null;
+}
+
 io.on('connection', (socket) => {
     console.log('A user connected:', socket.id);
+
+    // Derive client IP (favor proxy header when available) and normalize to IPv4
+    const forwardedFor = socket.handshake.headers['x-forwarded-for'];
+    const rawIp = forwardedFor ? forwardedFor.split(',')[0].trim() : socket.handshake.address;
+    const ipAddress = extractIPv4(rawIp) || 'unknown';
 
     // Update statistics
     serverStats.totalConnections++;
@@ -319,6 +341,7 @@ io.on('connection', (socket) => {
     // Initialize player state (will be updated when authenticated)
     players[socket.id] = {
         id: socket.id,
+        ip: ipAddress,
         board: Array(10).fill(null).map(() => Array(10).fill(0)), // 0: empty, 1: ship part, 2: hit, 3: miss
         ships: [], // List of ship coordinates
         ready: false,
@@ -359,6 +382,7 @@ io.on('connection', (socket) => {
     // Notify admin
     notifyAdmin('user_connected', {
         userId: socket.id,
+        ip: ipAddress,
         connectedAt: players[socket.id].connectedAt,
         totalUsers: Object.keys(players).length
     });
@@ -656,6 +680,7 @@ io.on('connection', (socket) => {
 
     socket.on('disconnect', () => {
         console.log('User disconnected:', socket.id);
+        const player = players[socket.id];
         delete players[socket.id];
         // Handle game cleanup...
         queue = queue.filter(id => id !== socket.id);
@@ -663,6 +688,7 @@ io.on('connection', (socket) => {
         // Notify admin
         notifyAdmin('user_disconnected', {
             userId: socket.id,
+            ip: player?.ip,
             totalUsers: Object.keys(players).length
         });
     });
