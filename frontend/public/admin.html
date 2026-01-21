@@ -171,7 +171,9 @@
         </div>
     </div>
 
-    <script src="/socket.io/socket.io.js"></script>
+    <!-- Socket.IO client (CDN) so admin UI can be deployed separately from backend -->
+    <script src="https://cdn.socket.io/4.7.4/socket.io.min.js" crossorigin="anonymous"></script>
+    <script src="config.js"></script>
     <script src="admin.js"></script>
 </body>
 

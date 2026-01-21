@@ -1,7 +1,6 @@
 const express = require('express');
 const http = require('http');
 const { Server } = require("socket.io");
-const path = require('path');
 const crypto = require('crypto');
 const cors = require('cors');
 
@@ -11,11 +10,30 @@ const gameRepository = require('./src/infrastructure/persistence/gameRepository'
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server);
+
+// CORS configuration for separate deployments
+// - Set CORS_ORIGIN to a comma-separated list of allowed origins (e.g. "https://game.example.com,https://admin.example.com")
+// - Use "*" ONLY for local/dev.
+const corsOriginsRaw = process.env.CORS_ORIGIN || '*';
+const corsOrigin =
+    corsOriginsRaw === '*'
+        ? '*'
+        : corsOriginsRaw.split(',').map(s => s.trim()).filter(Boolean);
+
+const io = new Server(server, {
+    cors: {
+        origin: corsOrigin,
+        methods: ['GET', 'POST'],
+        credentials: true
+    }
+});
 
 // Middleware
-app.use(cors()); // Enable CORS for all routes
-app.use(express.static(path.join(__dirname, 'public')));
+app.set('trust proxy', 1);
+app.use(cors({
+    origin: corsOrigin,
+    credentials: true
+}));
 app.use(express.json());
 
 // Admin Configuration
@@ -40,9 +58,9 @@ function authenticateToken(req, res, next) {
     }
 }
 
-// Admin Page Route
-app.get('/admin', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'admin.html'));
+// Backend is API-only. Frontend/admin UI are deployed separately.
+app.get('/health', (req, res) => {
+    res.json({ ok: true });
 });
 
 // Game State
@@ -771,7 +789,7 @@ io.on('connection', (socket) => {
     });
 });
 
-const PORT = 3000;
+const PORT = parseInt(process.env.PORT, 10) || 3000;
 server.listen(PORT, () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+    console.log(`Backend running on http://localhost:${PORT}`);
 });

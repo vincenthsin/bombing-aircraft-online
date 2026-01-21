@@ -5,6 +5,14 @@ let statsInterval = null;
 
 const SESSION_KEY = 'admin_session_token';
 
+// Backend configuration (supports separate frontend/backend deployment)
+const API_BASE_URL = (typeof window !== 'undefined' && window.API_BASE_URL) ? window.API_BASE_URL : '';
+const SOCKET_URL = (typeof window !== 'undefined' && window.SOCKET_URL) ? window.SOCKET_URL : '';
+function apiUrl(path) {
+    const base = (API_BASE_URL || '').replace(/\/+$/, '');
+    return `${base}${path}`;
+}
+
 // DOM Elements
 const authScreen = document.getElementById('auth-screen');
 const dashboardScreen = document.getElementById('dashboard-screen');
@@ -35,7 +43,7 @@ async function checkExistingSession() {
     if (!token) return false;
 
     try {
-        const response = await fetch('/api/admin/verify', {
+        const response = await fetch(apiUrl('/api/admin/verify'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ token })
@@ -70,7 +78,7 @@ authForm.addEventListener('submit', async (e) => {
     const password = passwordInput.value;
 
     try {
-        const response = await fetch('/api/admin/auth', {
+        const response = await fetch(apiUrl('/api/admin/auth'), {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -104,7 +112,7 @@ logoutBtn.addEventListener('click', async () => {
     // Notify server to invalidate the session
     if (token) {
         try {
-            await fetch('/api/admin/logout', {
+            await fetch(apiUrl('/api/admin/logout'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ token })
@@ -140,7 +148,7 @@ clearLogBtn.addEventListener('click', () => {
 // Initialize Dashboard
 function initializeDashboard() {
     // Connect to admin namespace
-    socket = io('/admin');
+    socket = SOCKET_URL ? io(`${SOCKET_URL}/admin`) : io('/admin');
 
     socket.on('connect', () => {
         addLogEntry('system', 'Connected to admin server');
@@ -213,7 +221,7 @@ function initializeDashboard() {
 // Fetch Statistics
 async function fetchStats() {
     try {
-        const response = await fetch('/api/admin/stats');
+        const response = await fetch(apiUrl('/api/admin/stats'));
         const stats = await response.json();
 
         statActiveUsers.textContent = stats.activeUsers;
@@ -230,7 +238,7 @@ async function fetchStats() {
 // Fetch Users
 async function fetchUsers() {
     try {
-        const response = await fetch('/api/admin/users');
+        const response = await fetch(apiUrl('/api/admin/users'));
         const users = await response.json();
 
         usersCount.textContent = users.length;
@@ -266,7 +274,7 @@ async function fetchUsers() {
 // Fetch Games
 async function fetchGames() {
     try {
-        const response = await fetch('/api/admin/games');
+        const response = await fetch(apiUrl('/api/admin/games'));
         const games = await response.json();
 
         const activeGames = games.filter(g => g.status !== 'finished');

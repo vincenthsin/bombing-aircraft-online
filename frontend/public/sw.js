@@ -1,10 +1,11 @@
-const CACHE_NAME = 'bombing-aircraft-v2';
+const CACHE_NAME = 'bombing-aircraft-v3';
 const urlsToCache = [
-    '/',
-    '/index.html',
-    '/style.css',
-    '/game.js',
-    '/manifest.json'
+    './',
+    './index.html',
+    './style.css',
+    './game.js',
+    './config.js',
+    './manifest.json'
 ];
 
 // Install event - cache static assets
@@ -45,6 +46,11 @@ self.addEventListener('activate', (event) => {
 
 // Fetch event - serve from cache, fallback to network
 self.addEventListener('fetch', (event) => {
+    // Skip API requests (must go to backend)
+    if (event.request.url.includes('/api/') || event.request.url.includes('localhost:3000')) {
+        return;
+    }
+
     // Skip socket.io requests (must go to network)
     if (event.request.url.includes('socket.io')) {
         return;

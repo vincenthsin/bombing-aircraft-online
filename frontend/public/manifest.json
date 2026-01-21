@@ -2,20 +2,20 @@
     "name": "Bombing Aircraft Online",
     "short_name": "Aircraft",
     "description": "A tactical online warfare game - destroy enemy aircraft!",
-    "start_url": "/",
+    "start_url": ".",
     "display": "standalone",
     "background_color": "#0b0c10",
     "theme_color": "#66fcf1",
     "orientation": "portrait",
     "icons": [
         {
-            "src": "/icon-192.png",
+            "src": "icon-192.png",
             "sizes": "192x192",
             "type": "image/png",
             "purpose": "any maskable"
         },
         {
-            "src": "/icon-512.png",
+            "src": "icon-512.png",
             "sizes": "512x512",
             "type": "image/png",
             "purpose": "any maskable"

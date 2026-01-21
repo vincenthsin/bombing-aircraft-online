@@ -1,7 +1,11 @@
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 
-const DB_PATH = path.join(__dirname, '../../../database.sqlite');
+// Allow configuring DB location for separate backend deployments
+// Default: database.sqlite in backend working directory
+const DB_PATH = process.env.DB_PATH
+    ? path.resolve(process.env.DB_PATH)
+    : path.join(process.cwd(), 'database.sqlite');
 
 // Create database connection
 const db = new sqlite3.Database(DB_PATH, (err) => {

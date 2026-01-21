@@ -4,10 +4,18 @@ let authToken = localStorage.getItem('authToken');
 let isAnonymous = false;
 let socketConnected = false;
 
+// Backend configuration (supports separate frontend/backend deployment)
+const API_BASE_URL = (typeof window !== 'undefined' && window.API_BASE_URL) ? window.API_BASE_URL : '';
+const SOCKET_URL = (typeof window !== 'undefined' && window.SOCKET_URL) ? window.SOCKET_URL : '';
+function apiUrl(path) {
+    const base = (window.API_BASE_URL || '').replace(/\/+$/, '');
+    return `${base}${path}`;
+}
+
 // Register Service Worker for PWA
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js')
+        navigator.serviceWorker.register('sw.js')
             .then(reg => {
                 console.log('Service Worker registered:', reg);
 
@@ -43,7 +51,8 @@ if ('serviceWorker' in navigator) {
     });
 }
 
-const socket = io();
+// Connect to backend Socket.IO (if SOCKET_URL is empty, falls back to same-origin)
+const socket = SOCKET_URL ? io(SOCKET_URL) : io();
 
 // Socket event handlers
 socket.on('connect', () => {
@@ -68,7 +77,7 @@ socket.on('authentication_error', (error) => {
 // Authentication functions
 async function login(username, password) {
     try {
-        const response = await fetch('/api/auth/login', {
+        const response = await fetch(apiUrl('/api/auth/login'), {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -92,7 +101,7 @@ async function login(username, password) {
 
 async function register(username, email, password) {
     try {
-        const response = await fetch('/api/auth/register', {
+        const response = await fetch(apiUrl('/api/auth/register'), {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -111,7 +120,7 @@ async function verifyAuth() {
     if (!authToken) return false;
 
     try {
-        const response = await fetch('/api/auth/verify', {
+        const response = await fetch(apiUrl('/api/auth/verify'), {
             headers: {
                 'Authorization': `Bearer ${authToken}`,
             },
@@ -851,7 +860,7 @@ async function loadProfile() {
 
     try {
         // Load user stats
-        const profileResponse = await fetch('/api/user/profile', {
+        const profileResponse = await fetch(apiUrl('/api/user/profile'), {
             headers: {
                 'Authorization': `Bearer ${authToken}`,
             },
@@ -870,7 +879,7 @@ async function loadProfile() {
         }
 
         // Load recent games
-        const historyResponse = await fetch('/api/user/recent-games?limit=10', {
+        const historyResponse = await fetch(apiUrl('/api/user/recent-games?limit=10'), {
             headers: {
                 'Authorization': `Bearer ${authToken}`,
             },
