@@ -4,7 +4,10 @@
   "private": true,
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "test": "node test-api.js && node test-anonymous.js",
+    "test:api": "node test-api.js",
+    "test:anonymous": "node test-anonymous.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
