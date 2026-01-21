@@ -1,0 +1,47 @@
+# Node modules
+node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Git
+.git
+.gitignore
+
+# CI/CD
+.github
+
+# Documentation
+README.md
+docs/
+
+# Development files
+backend/test-*.js
+backend/simulator.js
+frontend/login-test.html
+
+# Docker files (not needed in context)
+Dockerfile
+Dockerfile.*
+docker-compose.yml
+.dockerignore
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+logs
+*.log
+
+# Database files (will be created at runtime)
+*.sqlite
+*.db
+
+# Environment files
+.env
+.env.local
+.env.production
+
+# Scripts (not needed in container)
+scripts/

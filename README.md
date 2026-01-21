@@ -93,5 +93,22 @@ The aircraft is a **Heavy Bomber** (10 Cells):
     - **FATAL** (Black): Hitting the **Head** instantly destroys the entire aircraft.
 3.  **Victory**: Destroy all 3 enemy aircraft to win.
 
+## Deployment & CI/CD
+
+This project includes a comprehensive CI/CD pipeline for automated testing and deployment.
+
+### Quick Start
+1. **Set up deployment platforms** (Railway, Render, Heroku, Vercel, or Netlify)
+2. **Configure GitHub secrets** in your repository settings
+3. **Push to main branch** to trigger automatic deployment
+
+### Supported Platforms
+- **Backend**: Railway, Render, Heroku, Docker
+- **Frontend**: Vercel, Netlify, GitHub Pages
+- **Container**: Docker for any cloud platform
+
+### Documentation
+See [CI/CD Setup Guide](docs/CI-CD-SETUP.md) for detailed instructions.
+
 ## License
 MIT

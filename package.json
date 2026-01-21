@@ -5,7 +5,27 @@
   "private": true,
   "main": "backend/server.js",
   "scripts": {
-    "start": "npm --prefix backend start"
+    "start": "npm --prefix backend start",
+    "docker:build": "powershell scripts/build-local.ps1",
+    "docker:build:backend": "powershell scripts/build-local.ps1 -Service backend",
+    "docker:build:frontend": "powershell scripts/build-local.ps1 -Service frontend",
+    "docker:up": "docker compose up -d",
+    "docker:up:backend": "docker compose up -d backend",
+    "docker:up:frontend": "docker compose up -d frontend",
+    "docker:down": "docker compose down",
+    "docker:down:backend": "docker compose down backend",
+    "docker:down:frontend": "docker compose down frontend",
+    "docker:logs": "docker compose logs -f",
+    "docker:logs:backend": "docker compose logs -f backend",
+    "docker:logs:frontend": "docker compose logs -f frontend",
+    "docker:restart": "docker compose restart",
+    "docker:restart:backend": "docker compose restart backend",
+    "docker:restart:frontend": "docker compose restart frontend",
+    "setup-deployment": "powershell scripts/setup-deployment.ps1",
+    "setup-deployment:railway": "powershell scripts/setup-deployment.ps1 -Platform railway",
+    "setup-deployment:render": "powershell scripts/setup-deployment.ps1 -Platform render",
+    "setup-deployment:heroku": "powershell scripts/setup-deployment.ps1 -Platform heroku",
+    "setup-deployment:docker": "powershell scripts/setup-deployment.ps1 -Platform docker"
   },
   "dependencies": {
     "socket.io-client": "^4.8.3"
