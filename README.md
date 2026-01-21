@@ -14,19 +14,58 @@ Built with **Node.js**, **Express**, and **Socket.io**.
 
 ## How to Run
 
-1.  **Install Dependencies**
+This repo is split for **separate frontend + backend deployment**:
+
+- **Frontend**: `frontend/public/` (static files)
+- **Backend**: `backend/` (Node/Express + Socket.IO + SQLite)
+
+### Run backend (API + Socket.IO)
+
+1.  **Install dependencies**
     ```bash
+    cd backend
     npm install
     ```
 
-2.  **Start the Server**
+2.  **Start the server**
     ```bash
     npm start
     ```
 
-3.  **Play**
-    - Open your browser to `http://localhost:3000`.
-    - Open a second tab (or share the link with a friend on the same network) to simulate the opponent.
+Backend defaults to `http://localhost:3000`. You can configure:
+
+- `PORT`: backend listen port
+- `CORS_ORIGIN`: allowed frontend origins (comma-separated), or `*` for local dev
+- `JWT_SECRET`: JWT secret
+- `DB_PATH`: path to `database.sqlite`
+
+### Run frontend (static)
+
+Serve `frontend/public/` with any static server (Nginx, GitHub Pages, Vercel static, etc).
+
+For local development, you can use:
+```bash
+cd frontend/public
+npx http-server -p 8080 -c-1
+```
+
+**Player Entrance URL**: Players access the game via the frontend URL (e.g., `http://localhost:8080`)
+
+To point the frontend to your backend, set `window.__ENV__.API_BASE_URL` in `frontend/public/index.html`
+**before** `config.js` loads, or set `localStorage.API_BASE_URL`.
+
+Example (edit `frontend/public/index.html`):
+
+```html
+<script>
+  window.__ENV__ = { API_BASE_URL: "https://api.example.com" };
+</script>
+```
+
+If your Socket.IO server is on a different URL than the API base, you can also set:
+
+- `window.__ENV__.SOCKET_URL`
+- or `localStorage.SOCKET_URL`
 
 ## Game Rules
 
