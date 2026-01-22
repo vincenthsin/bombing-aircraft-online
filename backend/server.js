@@ -25,10 +25,6 @@ const io = new Server(server, {
         origin: corsOrigin,
         methods: ['GET', 'POST'],
         credentials: true
-    },
-    allowRequest: (req, callback) => {
-        // Allow requests with Vercel protection bypass
-        callback(null, true);
     }
 });
 
