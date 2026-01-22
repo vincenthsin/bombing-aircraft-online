@@ -52,38 +52,28 @@ if ('serviceWorker' in navigator) {
 }
 
 // Connect to backend Socket.IO (if SOCKET_URL is empty, falls back to same-origin)
+// Create a custom fetch function that adds the bypass header to Socket.IO requests
+const originalFetch = window.fetch;
+window.fetch = function(url, options = {}) {
+    if (typeof url === 'string' && url.includes('/socket.io/')) {
+        options.headers = options.headers || {};
+        options.headers['x-vercel-protection-bypass'] = 'pSVR2EaCmw9ZP7U3hEnNqUA1INinCrx1';
+    }
+    return originalFetch.call(this, url, options);
+};
+
 const socket = SOCKET_URL ? io(SOCKET_URL, {
-    extraHeaders: {
+    query: {
         'x-vercel-protection-bypass': 'pSVR2EaCmw9ZP7U3hEnNqUA1INinCrx1'
     },
-    transportOptions: {
-        polling: {
-            extraHeaders: {
-                'x-vercel-protection-bypass': 'pSVR2EaCmw9ZP7U3hEnNqUA1INinCrx1'
-            }
-        },
-        websocket: {
-            extraHeaders: {
-                'x-vercel-protection-bypass': 'pSVR2EaCmw9ZP7U3hEnNqUA1INinCrx1'
-            }
-        }
-    }
+    forceNew: true,
+    transports: ['polling', 'websocket']
 }) : io({
-    extraHeaders: {
+    query: {
         'x-vercel-protection-bypass': 'pSVR2EaCmw9ZP7U3hEnNqUA1INinCrx1'
     },
-    transportOptions: {
-        polling: {
-            extraHeaders: {
-                'x-vercel-protection-bypass': 'pSVR2EaCmw9ZP7U3hEnNqUA1INinCrx1'
-            }
-        },
-        websocket: {
-            extraHeaders: {
-                'x-vercel-protection-bypass': 'pSVR2EaCmw9ZP7U3hEnNqUA1INinCrx1'
-            }
-        }
-    }
+    forceNew: true,
+    transports: ['polling', 'websocket']
 });
 
 // Socket event handlers

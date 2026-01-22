@@ -30,22 +30,6 @@ const io = new Server(server, {
 
 // Middleware
 app.set('trust proxy', 1);
-
-// Vercel protection bypass validation
-app.use((req, res, next) => {
-    // Only check bypass header when deployed on Vercel
-    // Skip check for OPTIONS preflight requests and health checks
-    if (process.env.VERCEL && req.method !== 'OPTIONS' && req.path !== '/health') {
-        const bypassHeader = req.headers['x-vercel-protection-bypass'];
-        const expectedBypass = process.env.VERCEL_PROTECTION_BYPASS || 'pSVR2EaCmw9ZP7U3hEnNqUA1INinCrx1';
-
-        if (!bypassHeader || bypassHeader !== expectedBypass) {
-            return res.status(401).json({ error: 'Unauthorized' });
-        }
-    }
-    next();
-});
-
 app.use(cors({
     origin: corsOrigin,
     credentials: true
