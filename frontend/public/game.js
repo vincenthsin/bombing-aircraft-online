@@ -52,10 +52,10 @@ if ('serviceWorker' in navigator) {
 }
 
 // Connect to backend Socket.IO (if SOCKET_URL is empty, falls back to same-origin)
-// Create a custom fetch function that adds the bypass header to Socket.IO requests
+// Create a custom fetch function that adds the bypass header to backend requests
 const originalFetch = window.fetch;
 window.fetch = function(url, options = {}) {
-    if (typeof url === 'string' && url.includes('/socket.io/')) {
+    if (typeof url === 'string' && (url.includes('/socket.io/') || url.includes('/api/'))) {
         options.headers = options.headers || {};
         options.headers['x-vercel-protection-bypass'] = 'pSVR2EaCmw9ZP7U3hEnNqUA1INinCrx1';
     }
