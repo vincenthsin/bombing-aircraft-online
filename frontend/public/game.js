@@ -81,6 +81,7 @@ async function login(username, password) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                'x-vercel-protection-bypass': 'sez6eiUP1XDRUMhLgJF2rLmFVEdVCvkd',
             },
             body: JSON.stringify({ username, password }),
         });
@@ -105,6 +106,7 @@ async function register(username, email, password) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                'x-vercel-protection-bypass': 'sez6eiUP1XDRUMhLgJF2rLmFVEdVCvkd',
             },
             body: JSON.stringify({ username, email, password }),
         });
@@ -123,6 +125,7 @@ async function verifyAuth() {
         const response = await fetch(apiUrl('/api/auth/verify'), {
             headers: {
                 'Authorization': `Bearer ${authToken}`,
+                'x-vercel-protection-bypass': 'sez6eiUP1XDRUMhLgJF2rLmFVEdVCvkd',
             },
         });
 
@@ -863,6 +866,7 @@ async function loadProfile() {
         const profileResponse = await fetch(apiUrl('/api/user/profile'), {
             headers: {
                 'Authorization': `Bearer ${authToken}`,
+                'x-vercel-protection-bypass': 'sez6eiUP1XDRUMhLgJF2rLmFVEdVCvkd',
             },
         });
 
@@ -882,6 +886,7 @@ async function loadProfile() {
         const historyResponse = await fetch(apiUrl('/api/user/recent-games?limit=10'), {
             headers: {
                 'Authorization': `Bearer ${authToken}`,
+                'x-vercel-protection-bypass': 'sez6eiUP1XDRUMhLgJF2rLmFVEdVCvkd',
             },
         });
 
