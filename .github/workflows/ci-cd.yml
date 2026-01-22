@@ -298,7 +298,7 @@ jobs:
         sleep 30
 
         # Check if the backend is responding
-        if curl -f -H "x-vercel-protection-bypass: pSVR2EaCmw9ZP7U3hEnNqUA1INinCrx1" "${{ needs.deploy-staging.outputs.backend-url }}/health"; then
+        if curl -f "${{ needs.deploy-staging.outputs.backend-url }}/health"; then
           echo "Backend health check passed!"
         else
           echo "Backend health check failed!"
@@ -306,7 +306,7 @@ jobs:
         fi
 
         # Check if the frontend is responding
-        if curl -f -H "x-vercel-protection-bypass: sez6eiUP1XDRUMhLgJF2rLmFVEdVCvkd" "${{ needs.deploy-staging.outputs.frontend-url }}"; then
+        if curl -f "${{ needs.deploy-staging.outputs.frontend-url }}"; then
           echo "Frontend health check passed!"
         else
           echo "Frontend health check failed!"
