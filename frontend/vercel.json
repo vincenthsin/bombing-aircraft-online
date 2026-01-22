@@ -1,7 +1,7 @@
 {
   "version": 2,
   "env": {
-    "API_BASE_URL": "https://backend-build-f7r0wix8q-vincenthsins-projects.vercel.app",
-    "SOCKET_URL": "https://backend-build-f7r0wix8q-vincenthsins-projects.vercel.app"
+    "API_BASE_URL": "https://backend-build-dfu0r21qd-vincenthsins-projects.vercel.app",
+    "SOCKET_URL": "https://backend-build-dfu0r21qd-vincenthsins-projects.vercel.app"
   }
 }
