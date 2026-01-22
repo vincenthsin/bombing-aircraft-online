@@ -2,7 +2,7 @@ name: CI/CD Pipeline
 
 on:
   push:
-    branches: [ main, master, develop ]
+    branches: [ main, master, develop, 31-create-cicd-pipeline ]
   pull_request:
     branches: [ main, master, develop ]
 
@@ -69,7 +69,7 @@ jobs:
   build:
     needs: test
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/31-create-cicd-pipeline'
 
     steps:
     - name: Checkout code
@@ -107,7 +107,7 @@ jobs:
   deploy-staging:
     needs: build
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/develop' && github.event_name == 'push'
+    if: github.ref == 'refs/heads/31-create-cicd-pipeline ' && github.event_name == 'push'
     environment: staging
 
     steps:
