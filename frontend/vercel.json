@@ -13,7 +13,7 @@
     }
   ],
   "env": {
-    "API_BASE_URL": "https://backend-build-vincenthsins-projects.vercel.app",
-    "SOCKET_URL": "https://backend-build-vincenthsins-projects.vercel.app"
+    "API_BASE_URL": "https://your-backend-domain.vercel.app",
+    "SOCKET_URL": "https://your-backend-domain.vercel.app"
   }
 }

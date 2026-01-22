@@ -107,6 +107,36 @@ This project includes a comprehensive CI/CD pipeline for automated testing and d
 - **Frontend**: Vercel, Netlify, GitHub Pages
 - **Container**: Docker for any cloud platform
 
+### Integration Testing
+
+The project includes automated integration testing for deployed environments.
+
+#### CI/CD Integration Testing
+
+The GitHub Actions workflow automatically:
+1. Deploys backend and captures its URL
+2. Updates frontend configuration with the backend URL
+3. Deploys frontend with correct backend connection
+4. Runs comprehensive integration tests
+
+#### Manual Configuration Update
+
+Update frontend configuration with actual backend URL:
+```bash
+# Update frontend/vercel.json with actual backend URL
+npm run update-frontend-config https://your-backend.vercel.app
+
+# Or directly with Node.js
+node scripts/update-frontend-config.js https://your-backend.vercel.app
+```
+
+#### Dynamic Domain Resolution
+
+For platforms like Vercel that generate dynamic domains, the CI/CD pipeline automatically:
+1. Captures deployment URLs from `vercel --yes` output
+2. Updates frontend `vercel.json` environment variables with actual backend URL
+3. Tests the integration with real deployed URLs
+
 ### Documentation
 See [CI/CD Setup Guide](docs/CI-CD-SETUP.md) for detailed instructions.
 
