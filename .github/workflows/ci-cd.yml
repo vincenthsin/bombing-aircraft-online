@@ -179,10 +179,11 @@ jobs:
 
     - name: Update Frontend Config with Backend URL
       run: |
+        # Copy the update script to frontend-build directory and run it
+        cp scripts/update-frontend-config.js frontend-build/
         cd frontend-build
-        # Update vercel.json with the actual backend URL
-        sed -i "s|https://your-backend-domain.vercel.app|${{ steps.deploy-backend.outputs.BACKEND_URL }}|g" vercel.json
-        echo "Updated frontend config with backend URL: ${{ steps.deploy-backend.outputs.BACKEND_URL }}"
+        # Update vercel.json with the actual backend URL using the script
+        node update-frontend-config.js ${{ steps.deploy-backend.outputs.BACKEND_URL }}
 
     - name: Deploy Frontend to Vercel (Staging)
       id: deploy-frontend
