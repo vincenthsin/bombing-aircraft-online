@@ -93,15 +93,21 @@ jobs:
         mkdir -p backend/public
         cp -r frontend/public/* backend/public/
 
-    - name: Upload build artifacts
+    - name: Upload backend build artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: build-artifacts
+        name: backend-build-artifacts
         path: |
           backend/
           !backend/node_modules/
           !backend/test-*.js
           !backend/simulator.js
+
+    - name: Upload frontend build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: frontend-build-artifacts
+        path: frontend/public/
 
   # Deploy to staging
   deploy-staging:
@@ -111,16 +117,22 @@ jobs:
     environment: staging
 
     steps:
-    - name: Download build artifacts
+    - name: Download backend build artifacts
       uses: actions/download-artifact@v4
       with:
-        name: build-artifacts
-        path: ./build
+        name: backend-build-artifacts
+        path: ./backend-build
+
+    - name: Download frontend build artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: frontend-build-artifacts
+        path: ./frontend-build
 
     - name: Deploy to Vercel (Staging)
       run: |
         npm install -g vercel
-        cd frontend/public
+        cd frontend-build
         vercel --token ${{ secrets.VERCEL_TOKEN }} --yes
         echo "Staging frontend deployed to Vercel"
 
