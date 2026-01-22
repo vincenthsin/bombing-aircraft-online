@@ -5,6 +5,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
+    "setup-postgres": "node setup-postgres.js",
     "test": "node test-api.js && node test-anonymous.js",
     "test:api": "node test-api.js",
     "test:anonymous": "node test-anonymous.js"
@@ -16,7 +17,9 @@
     "jsonwebtoken": "^9.0.2",
     "socket.io": "^4.7.4",
     "socket.io-client": "^4.8.3",
-    "sqlite3": "^5.1.6"
+    "sqlite3": "^5.1.6",
+    "@vercel/postgres": "^0.5.1",
+    "pg": "^8.11.3"
   },
   "devDependencies": {
     "node-fetch": "^2.7.0"

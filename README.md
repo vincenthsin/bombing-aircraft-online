@@ -11,6 +11,7 @@ Built with **Node.js**, **Express**, and **Socket.io**.
 
 ## Prerequisites
 - [Node.js](https://nodejs.org/) (v16+ recommended)
+- For production: PostgreSQL database (Vercel Postgres, Railway, etc.)
 
 ## How to Run
 
@@ -27,7 +28,22 @@ This repo is split for **separate frontend + backend deployment**:
     npm install
     ```
 
-2.  **Start the server**
+2.  **Database Setup**
+
+    **For Local Development (SQLite):**
+    ```bash
+    # SQLite is used automatically for local development
+    # Database file will be created at backend/database.sqlite
+    ```
+
+    **For Production (PostgreSQL):**
+    ```bash
+    # Set DATABASE_URL environment variable, or set USE_POSTGRES=true
+    # Then run setup script:
+    npm run setup-postgres
+    ```
+
+3.  **Start the server**
     ```bash
     npm start
     ```
@@ -37,7 +53,8 @@ Backend defaults to `http://localhost:3000`. You can configure:
 - `PORT`: backend listen port
 - `CORS_ORIGIN`: allowed frontend origins (comma-separated), or `*` for local dev
 - `JWT_SECRET`: JWT secret
-- `DB_PATH`: path to `database.sqlite`
+- `DB_PATH`: path to `database.sqlite` (local development only)
+- `DATABASE_URL`: PostgreSQL connection string (production)
 
 ### Run frontend (static)
 
@@ -103,9 +120,10 @@ This project includes a comprehensive CI/CD pipeline for automated testing and d
 3. **Push to main branch** to trigger automatic deployment
 
 ### Supported Platforms
-- **Backend**: Railway, Render, Heroku, Docker
+- **Backend**: Railway, Render, Heroku, Vercel (with Postgres), Docker
 - **Frontend**: Vercel, Netlify, GitHub Pages
 - **Container**: Docker for any cloud platform
+- **Database**: SQLite (local), PostgreSQL (production)
 
 ### Integration Testing
 
