@@ -103,11 +103,19 @@ jobs:
           !backend/test-*.js
           !backend/simulator.js
 
+    - name: Prepare frontend build artifacts
+      run: |
+        # Create a frontend build directory with all necessary files
+        mkdir -p frontend-build
+        cp -r frontend/public/* frontend-build/
+        cp frontend/vercel.json frontend-build/
+        echo "Frontend build prepared with vercel.json"
+
     - name: Upload frontend build artifacts
       uses: actions/upload-artifact@v4
       with:
         name: frontend-build-artifacts
-        path: frontend/public/
+        path: frontend-build/
 
   # Deploy to staging
   deploy-staging:
