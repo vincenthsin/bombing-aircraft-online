@@ -179,11 +179,24 @@ jobs:
 
     - name: Update Frontend Config with Backend URL
       run: |
+        # Debug: Check current directory and available files
+        pwd
+        ls -la
+        ls -la scripts/ || echo "scripts directory not found"
+        ls -la frontend-build/ || echo "frontend-build directory not found"
+
         # Copy the update script to frontend-build directory and run it
-        cp scripts/update-frontend-config.js frontend-build/
-        cd frontend-build
-        # Update vercel.json with the actual backend URL using the script
-        node update-frontend-config.js ${{ steps.deploy-backend.outputs.BACKEND_URL }}
+        if [ -f "scripts/update-frontend-config.js" ]; then
+          cp scripts/update-frontend-config.js frontend-build/
+          cd frontend-build
+          # Update vercel.json with the actual backend URL using the script
+          node update-frontend-config.js ${{ steps.deploy-backend.outputs.BACKEND_URL }}
+        else
+          echo "Script not found, falling back to sed command"
+          cd frontend-build
+          sed -i "s|https://your-backend-domain.vercel.app|${{ steps.deploy-backend.outputs.BACKEND_URL }}|g" vercel.json
+          echo "Updated frontend config with backend URL: ${{ steps.deploy-backend.outputs.BACKEND_URL }}"
+        fi
 
     - name: Deploy Frontend to Vercel (Staging)
       id: deploy-frontend
