@@ -54,11 +54,35 @@ if ('serviceWorker' in navigator) {
 // Connect to backend Socket.IO (if SOCKET_URL is empty, falls back to same-origin)
 const socket = SOCKET_URL ? io(SOCKET_URL, {
     extraHeaders: {
-        'x-vercel-protection-bypass': 'sez6eiUP1XDRUMhLgJF2rLmFVEdVCvkd'
+        'x-vercel-protection-bypass': 'pSVR2EaCmw9ZP7U3hEnNqUA1INinCrx1'
+    },
+    transportOptions: {
+        polling: {
+            extraHeaders: {
+                'x-vercel-protection-bypass': 'pSVR2EaCmw9ZP7U3hEnNqUA1INinCrx1'
+            }
+        },
+        websocket: {
+            extraHeaders: {
+                'x-vercel-protection-bypass': 'pSVR2EaCmw9ZP7U3hEnNqUA1INinCrx1'
+            }
+        }
     }
 }) : io({
     extraHeaders: {
-        'x-vercel-protection-bypass': 'sez6eiUP1XDRUMhLgJF2rLmFVEdVCvkd'
+        'x-vercel-protection-bypass': 'pSVR2EaCmw9ZP7U3hEnNqUA1INinCrx1'
+    },
+    transportOptions: {
+        polling: {
+            extraHeaders: {
+                'x-vercel-protection-bypass': 'pSVR2EaCmw9ZP7U3hEnNqUA1INinCrx1'
+            }
+        },
+        websocket: {
+            extraHeaders: {
+                'x-vercel-protection-bypass': 'pSVR2EaCmw9ZP7U3hEnNqUA1INinCrx1'
+            }
+        }
     }
 });
 
@@ -89,7 +113,7 @@ async function login(username, password) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'x-vercel-protection-bypass': 'sez6eiUP1XDRUMhLgJF2rLmFVEdVCvkd',
+                'x-vercel-protection-bypass': 'pSVR2EaCmw9ZP7U3hEnNqUA1INinCrx1',
             },
             body: JSON.stringify({ username, password }),
         });
@@ -114,7 +138,7 @@ async function register(username, email, password) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'x-vercel-protection-bypass': 'sez6eiUP1XDRUMhLgJF2rLmFVEdVCvkd',
+                'x-vercel-protection-bypass': 'pSVR2EaCmw9ZP7U3hEnNqUA1INinCrx1',
             },
             body: JSON.stringify({ username, email, password }),
         });
@@ -133,7 +157,7 @@ async function verifyAuth() {
         const response = await fetch(apiUrl('/api/auth/verify'), {
             headers: {
                 'Authorization': `Bearer ${authToken}`,
-                'x-vercel-protection-bypass': 'sez6eiUP1XDRUMhLgJF2rLmFVEdVCvkd',
+                'x-vercel-protection-bypass': 'pSVR2EaCmw9ZP7U3hEnNqUA1INinCrx1',
             },
         });
 
@@ -874,7 +898,7 @@ async function loadProfile() {
         const profileResponse = await fetch(apiUrl('/api/user/profile'), {
             headers: {
                 'Authorization': `Bearer ${authToken}`,
-                'x-vercel-protection-bypass': 'sez6eiUP1XDRUMhLgJF2rLmFVEdVCvkd',
+                'x-vercel-protection-bypass': 'pSVR2EaCmw9ZP7U3hEnNqUA1INinCrx1',
             },
         });
 
@@ -894,7 +918,7 @@ async function loadProfile() {
         const historyResponse = await fetch(apiUrl('/api/user/recent-games?limit=10'), {
             headers: {
                 'Authorization': `Bearer ${authToken}`,
-                'x-vercel-protection-bypass': 'sez6eiUP1XDRUMhLgJF2rLmFVEdVCvkd',
+                'x-vercel-protection-bypass': 'pSVR2EaCmw9ZP7U3hEnNqUA1INinCrx1',
             },
         });
 
