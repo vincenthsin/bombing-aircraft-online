@@ -25,6 +25,10 @@ const io = new Server(server, {
         origin: corsOrigin,
         methods: ['GET', 'POST'],
         credentials: true
+    },
+    allowRequest: (req, callback) => {
+        // Allow requests with Vercel protection bypass
+        callback(null, true);
     }
 });
 
@@ -307,7 +311,13 @@ app.get('/api/games/:gameId/details', authenticateToken, async (req, res) => {
 });
 
 // Admin Socket.IO Namespace
-const adminNamespace = io.of('/admin');
+const adminNamespace = io.of('/admin', {
+    cors: {
+        origin: corsOrigin,
+        methods: ['GET', 'POST'],
+        credentials: true
+    }
+});
 adminNamespace.on('connection', (socket) => {
     console.log('Admin connected:', socket.id);
 
