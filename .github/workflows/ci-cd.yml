@@ -115,6 +115,9 @@ jobs:
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/31-create-cicd-pipeline' && github.event_name == 'push'
     environment: staging
+    outputs:
+      backend-url: ${{ steps.deploy-backend.outputs.BACKEND_URL }}
+      frontend-url: ${{ steps.deploy-frontend.outputs.FRONTEND_URL }}
 
     steps:
     - name: Download backend build artifacts
@@ -153,18 +156,33 @@ jobs:
         appdir: "backend-build"
 
     - name: Deploy Backend to Vercel (Staging)
+      id: deploy-backend
       run: |
         npm install -g vercel
         cd backend-build
-        vercel --token ${{ secrets.VERCEL_TOKEN }} --yes
-        echo "Staging backend deployed to Vercel"
+        # Capture the deployment URL from vercel output
+        DEPLOY_OUTPUT=$(vercel --token ${{ secrets.VERCEL_TOKEN }} --yes)
+        BACKEND_URL=$(echo "$DEPLOY_OUTPUT" | grep -o 'https://[^[:space:]]*' | head -1)
+        echo "BACKEND_URL=$BACKEND_URL" >> $GITHUB_OUTPUT
+        echo "Staging backend deployed to: $BACKEND_URL"
+
+    - name: Update Frontend Config with Backend URL
+      run: |
+        cd frontend-build
+        # Update vercel.json with the actual backend URL
+        sed -i "s|https://your-backend-domain.vercel.app|${{ steps.deploy-backend.outputs.BACKEND_URL }}|g" vercel.json
+        echo "Updated frontend config with backend URL: ${{ steps.deploy-backend.outputs.BACKEND_URL }}"
 
     - name: Deploy Frontend to Vercel (Staging)
+      id: deploy-frontend
       run: |
         npm install -g vercel
         cd frontend-build
-        vercel --token ${{ secrets.VERCEL_TOKEN }} --yes
-        echo "Staging frontend deployed to Vercel"
+        # Capture the deployment URL from vercel output
+        DEPLOY_OUTPUT=$(vercel --token ${{ secrets.VERCEL_TOKEN }} --yes)
+        FRONTEND_URL=$(echo "$DEPLOY_OUTPUT" | grep -o 'https://[^[:space:]]*' | head -1)
+        echo "FRONTEND_URL=$FRONTEND_URL" >> $GITHUB_OUTPUT
+        echo "Staging frontend deployed to: $FRONTEND_URL"
 
   # Deploy to production - COMMENTED OUT
   # deploy-production:
@@ -217,7 +235,7 @@ jobs:
   #       cd frontend/public
   #       netlify deploy --prod --dir . --auth ${{ secrets.NETLIFY_AUTH_TOKEN }} --site ${{ secrets.NETLIFY_SITE_ID }}
 
-  # Health check after deployment
+  # Health check and integration testing
   health-check:
     needs: [deploy-staging]  # deploy-production commented out
     runs-on: ubuntu-latest
@@ -230,13 +248,38 @@ jobs:
         # Wait for deployment to be ready
         sleep 30
 
-        # Check if the app is responding
-        if curl -f ${{ secrets.STAGING_URL }}/health; then
-          echo "Staging deployment successful!"
+        # Check if the backend is responding
+        if curl -f "${{ needs.deploy-staging.outputs.backend-url }}/health"; then
+          echo "Backend health check passed!"
         else
-          echo "Staging health check failed!"
+          echo "Backend health check failed!"
           exit 1
         fi
+
+        # Check if the frontend is responding
+        if curl -f "${{ needs.deploy-staging.outputs.frontend-url }}"; then
+          echo "Frontend health check passed!"
+        else
+          echo "Frontend health check failed!"
+          exit 1
+        fi
+
+        echo "Staging deployment successful!"
+        echo "Frontend URL: ${{ needs.deploy-staging.outputs.frontend-url }}"
+        echo "Backend URL: ${{ needs.deploy-staging.outputs.backend-url }}"
+
+    - name: Run Integration Tests
+      if: needs.deploy-staging.result == 'success'
+      run: |
+        echo "Running comprehensive integration tests..."
+        echo "Frontend: ${{ needs.deploy-staging.outputs.frontend-url }}"
+        echo "Backend: ${{ needs.deploy-staging.outputs.backend-url }}"
+
+        # Install dependencies for integration tests
+        npm install socket.io-client
+
+        # Run the integration test script
+        node scripts/integration-test.js "${{ needs.deploy-staging.outputs.frontend-url }}" "${{ needs.deploy-staging.outputs.backend-url }}"
 
     # - name: Health check for production
     #   if: needs.deploy-production.result == 'success'

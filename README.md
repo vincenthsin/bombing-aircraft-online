@@ -49,6 +49,51 @@ cd frontend/public
 npx http-server -p 8080 -c-1
 ```
 
+## Integration Testing
+
+The project includes automated integration testing for deployed environments.
+
+### CI/CD Integration Testing
+
+The GitHub Actions workflow automatically:
+1. Deploys backend and captures its URL
+2. Updates frontend configuration with the backend URL
+3. Deploys frontend with correct backend connection
+4. Runs comprehensive integration tests
+
+### Manual Integration Testing
+
+After deployment, test the integration manually:
+
+#### Using Node.js Script
+```bash
+# Install dependencies
+npm install
+
+# Run integration tests
+node scripts/integration-test.js https://your-frontend.vercel.app https://your-backend.vercel.app
+```
+
+#### Using PowerShell Script (Windows)
+```powershell
+.\scripts\test-deployed-integration.ps1 -FrontendUrl "https://your-frontend.vercel.app" -BackendUrl "https://your-backend.vercel.app"
+```
+
+### What Gets Tested
+
+- ✅ Backend health endpoint (`/health`)
+- ✅ Frontend loads successfully
+- ✅ Socket.IO connection works
+- ✅ CORS configuration
+- ✅ API connectivity between frontend and backend
+
+### Dynamic Domain Resolution
+
+For platforms like Vercel that generate dynamic domains, the CI/CD pipeline automatically:
+1. Captures deployment URLs from `vercel --yes` output
+2. Updates frontend configuration with actual backend URL
+3. Tests the integration with real deployed URLs
+
 **Player Entrance URL**: Players access the game via the frontend URL (e.g., `http://localhost:8080`)
 
 To point the frontend to your backend, set `window.__ENV__.API_BASE_URL` in `frontend/public/index.html`
