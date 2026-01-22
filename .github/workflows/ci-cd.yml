@@ -109,7 +109,10 @@ jobs:
         mkdir -p frontend-build
         cp -r frontend/public/* frontend-build/
         cp frontend/vercel.json frontend-build/
-        echo "Frontend build prepared with vercel.json"
+        # List files for debugging
+        echo "Frontend build contents:"
+        ls -la frontend-build/
+        echo "Frontend build prepared successfully"
 
     - name: Upload frontend build artifacts
       uses: actions/upload-artifact@v4
@@ -186,8 +189,12 @@ jobs:
       run: |
         npm install -g vercel
         cd frontend-build
+        echo "Current directory contents:"
+        pwd && ls -la
+        echo "Deploying to Vercel..."
         # Capture the deployment URL from vercel output
         DEPLOY_OUTPUT=$(vercel --token ${{ secrets.VERCEL_TOKEN }} --yes)
+        echo "Vercel output: $DEPLOY_OUTPUT"
         FRONTEND_URL=$(echo "$DEPLOY_OUTPUT" | grep -o 'https://[^[:space:]]*' | head -1)
         echo "FRONTEND_URL=$FRONTEND_URL" >> $GITHUB_OUTPUT
         echo "Staging frontend deployed to: $FRONTEND_URL"
