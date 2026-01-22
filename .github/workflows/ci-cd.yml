@@ -118,7 +118,7 @@ jobs:
         path: ./build
 
     - name: Deploy to Vercel (Staging)
-      if: env.VERCEL_TOKEN != ''
+      if: secrets.VERCEL_TOKEN != ''
       run: |
         npm install -g vercel
         cd frontend/public
