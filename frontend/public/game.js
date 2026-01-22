@@ -52,7 +52,15 @@ if ('serviceWorker' in navigator) {
 }
 
 // Connect to backend Socket.IO (if SOCKET_URL is empty, falls back to same-origin)
-const socket = SOCKET_URL ? io(SOCKET_URL) : io();
+const socket = SOCKET_URL ? io(SOCKET_URL, {
+    extraHeaders: {
+        'x-vercel-protection-bypass': 'sez6eiUP1XDRUMhLgJF2rLmFVEdVCvkd'
+    }
+}) : io({
+    extraHeaders: {
+        'x-vercel-protection-bypass': 'sez6eiUP1XDRUMhLgJF2rLmFVEdVCvkd'
+    }
+});
 
 // Socket event handlers
 socket.on('connect', () => {
