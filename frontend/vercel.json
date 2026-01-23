@@ -3,5 +3,11 @@
   "env": {
     "API_BASE_URL": "https://bombing-aircraft-backend.onrender.com",
     "SOCKET_URL": "https://bombing-aircraft-backend.onrender.com"
-  }
+  },
+  "rewrites": [
+    {
+      "source": "/admin",
+      "destination": "/admin.html"
+    }
+  ]
 }
