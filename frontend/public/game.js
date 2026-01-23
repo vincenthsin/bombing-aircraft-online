@@ -52,7 +52,15 @@ if ('serviceWorker' in navigator) {
 }
 
 // Connect to backend Socket.IO (if SOCKET_URL is empty, falls back to same-origin)
-const socket = SOCKET_URL ? io(SOCKET_URL) : io();
+// API requests use standard fetch
+
+const socket = SOCKET_URL ? io(SOCKET_URL, {
+    forceNew: true,
+    transports: ['polling', 'websocket']
+}) : io({
+    forceNew: true,
+    transports: ['polling', 'websocket']
+});
 
 // Socket event handlers
 socket.on('connect', () => {

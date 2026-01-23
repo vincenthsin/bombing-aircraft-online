@@ -1,11 +1,24 @@
 const { runQuery, getRow, getAllRows } = require('./database');
 
+// Check if using PostgreSQL
+const USE_POSTGRES = process.env.DATABASE_URL || process.env.USE_POSTGRES === 'true';
+
+// Helper function to convert SQLite ? placeholders to PostgreSQL $1, $2, etc.
+function convertQueryForPostgres(sql, params) {
+    if (!USE_POSTGRES) return { sql, params };
+
+    let paramIndex = 1;
+    const convertedSql = sql.replace(/\?/g, () => `$${paramIndex++}`);
+    return { sql: convertedSql, params };
+}
+
 class GameRepository {
     async createGameSession(gameId, player1Id, player2Id) {
-        const result = await runQuery(
+        const { sql, params } = convertQueryForPostgres(
             'INSERT INTO game_sessions (game_id, player1_id, player2_id) VALUES (?, ?, ?)',
             [gameId, player1Id, player2Id]
         );
+        const result = await runQuery(sql, params);
         return result.id;
     }
 
@@ -32,27 +45,31 @@ class GameRepository {
         query += ' WHERE game_id = ?';
         params.push(gameId);
 
-        await runQuery(query, params);
+        const { sql, finalParams } = convertQueryForPostgres(query, params);
+        await runQuery(sql, finalParams);
     }
 
     async findByGameId(gameId) {
-        return await getRow('SELECT * FROM game_sessions WHERE game_id = ?', [gameId]);
+        const { sql, params } = convertQueryForPostgres('SELECT * FROM game_sessions WHERE game_id = ?', [gameId]);
+        return await getRow(sql, params);
     }
 
     async recordMove(gameSessionId, playerId, moveType, x = null, y = null, result = null, moveNumber) {
-        await runQuery(
+        const { sql, params } = convertQueryForPostgres(
             'INSERT INTO game_moves (game_session_id, player_id, move_type, x, y, result, move_number) VALUES (?, ?, ?, ?, ?, ?, ?)',
             [gameSessionId, playerId, moveType, x, y, result, moveNumber]
         );
+        await runQuery(sql, params);
     }
 
     async updateUserStats(userId, gameResult, shots = 0, hits = 0, misses = 0, fatalHits = 0, duration = 0) {
         // First check if user stats exist
-        let existingStats = await getRow('SELECT * FROM user_stats WHERE user_id = ?', [userId]);
+        const { sql: findSql, params: findParams } = convertQueryForPostgres('SELECT * FROM user_stats WHERE user_id = ?', [userId]);
+        let existingStats = await getRow(findSql, findParams);
 
         if (!existingStats) {
             // Create initial stats
-            await runQuery(`
+            const { sql: insertSql, params: insertParams } = convertQueryForPostgres(`
                 INSERT INTO user_stats (user_id, games_played, games_won, games_lost, total_shots, hits, misses, fatal_hits, average_game_duration, win_rate)
                 VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, ?)
             `, [
@@ -63,6 +80,7 @@ class GameRepository {
                 duration,
                 gameResult === 'win' ? 100 : 0
             ]);
+            await runQuery(insertSql, insertParams);
         } else {
             // Update existing stats
             const newGamesPlayed = existingStats.games_played + 1;
@@ -78,7 +96,7 @@ class GameRepository {
             const newAverageDuration = (currentTotalDuration + duration) / newGamesPlayed;
             const newWinRate = newGamesPlayed > 0 ? (newGamesWon / newGamesPlayed) * 100 : 0;
 
-            await runQuery(`
+            const { sql: updateSql, params: updateParams } = convertQueryForPostgres(`
                 UPDATE user_stats SET
                     games_played = ?,
                     games_won = ?,
@@ -95,6 +113,7 @@ class GameRepository {
                 newGamesPlayed, newGamesWon, newGamesLost, newTotalShots,
                 newHits, newMisses, newFatalHits, newAverageDuration, newWinRate, userId
             ]);
+            await runQuery(updateSql, updateParams);
         }
     }
 
@@ -102,7 +121,7 @@ class GameRepository {
         const gameSession = await this.findByGameId(gameId);
         if (!gameSession) return [];
 
-        return await getAllRows(`
+        const { sql, params } = convertQueryForPostgres(`
             SELECT
                 gm.move_type,
                 gm.x,
@@ -116,10 +135,12 @@ class GameRepository {
             WHERE gm.game_session_id = ?
             ORDER BY gm.move_number ASC
         `, [gameSession.id]);
+
+        return await getAllRows(sql, params);
     }
 
     async getGameDetails(gameId) {
-        const game = await getRow(`
+        const { sql, params } = convertQueryForPostgres(`
             SELECT
                 gs.*,
                 u1.username as player1_username,
@@ -134,6 +155,8 @@ class GameRepository {
             JOIN users u2 ON gs.player2_id = u2.id
             WHERE gs.game_id = ?
         `, [gameId]);
+
+        const game = await getRow(sql, params);
 
         if (game) {
             game.moves = await this.getGameMoves(gameId);

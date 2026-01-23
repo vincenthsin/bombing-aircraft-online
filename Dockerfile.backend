@@ -1,22 +1,28 @@
-# Backend Dockerfile
+# Backend Dockerfile - Production Optimized
 FROM node:18-alpine
 
 # Set working directory
 WORKDIR /app
 
-# Copy package files
+# Install system dependencies for sqlite3 and dumb-init for proper signal handling
+RUN apk add --no-cache python3 make g++ sqlite-dev dumb-init
+
+# Copy package files first for better layer caching
 COPY backend/package*.json ./
 
-# Install system dependencies for sqlite3
-RUN apk add --no-cache python3 make g++ sqlite-dev && \
-    npm ci --only=production && \
+# Install dependencies and rebuild sqlite3 for alpine
+RUN npm ci --only=production && \
     npm rebuild sqlite3 && \
     npm cache clean --force
 
 # Copy backend source code
 COPY backend/ ./
 
-# Create a non-root user
+# Create directory for persistent database storage
+RUN mkdir -p /app/data && \
+    chmod 755 /app/data
+
+# Create a non-root user for security
 RUN addgroup -g 1001 -S nodejs && \
     adduser -S nodejs -u 1001
 
@@ -24,8 +30,15 @@ RUN addgroup -g 1001 -S nodejs && \
 RUN chown -R nodejs:nodejs /app
 USER nodejs
 
-# Expose port
+# Expose port (Render uses PORT env variable)
 EXPOSE 3000
+
+# Health check to ensure container is running properly
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:3000/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
+
+# Use dumb-init to handle signals properly
+ENTRYPOINT ["dumb-init", "--"]
 
 # Start the application
 CMD ["node", "server.js"]

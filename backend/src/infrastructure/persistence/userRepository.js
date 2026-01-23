@@ -1,17 +1,30 @@
 const { runQuery, getRow, getAllRows } = require('./database');
 const bcrypt = require('bcryptjs');
 
+// Check if using PostgreSQL
+const USE_POSTGRES = process.env.DATABASE_URL || process.env.USE_POSTGRES === 'true';
+
+// Helper function to convert SQLite ? placeholders to PostgreSQL $1, $2, etc.
+function convertQueryForPostgres(sql, params) {
+    if (!USE_POSTGRES) return { sql, params };
+
+    let paramIndex = 1;
+    const convertedSql = sql.replace(/\?/g, () => `$${paramIndex++}`);
+    return { sql: convertedSql, params };
+}
+
 class UserRepository {
     async createUser(username, email, password) {
         try {
             const passwordHash = await bcrypt.hash(password, 10);
-            const result = await runQuery(
+            const { sql, params } = convertQueryForPostgres(
                 'INSERT INTO users (username, email, password_hash) VALUES (?, ?, ?)',
                 [username, email, passwordHash]
             );
+            const result = await runQuery(sql, params);
             return result.id;
         } catch (error) {
-            if (error.message.includes('UNIQUE constraint failed')) {
+            if (error.message.includes('UNIQUE constraint failed') || error.message.includes('duplicate key value')) {
                 throw new Error('Username or email already exists');
             }
             throw error;
@@ -19,15 +32,18 @@ class UserRepository {
     }
 
     async findByUsername(username) {
-        return await getRow('SELECT * FROM users WHERE username = ? AND is_active = 1', [username]);
+        const { sql, params } = convertQueryForPostgres('SELECT * FROM users WHERE username = ? AND is_active = 1', [username]);
+        return await getRow(sql, params);
     }
 
     async findByEmail(email) {
-        return await getRow('SELECT * FROM users WHERE email = ? AND is_active = 1', [email]);
+        const { sql, params } = convertQueryForPostgres('SELECT * FROM users WHERE email = ? AND is_active = 1', [email]);
+        return await getRow(sql, params);
     }
 
     async findById(id) {
-        return await getRow('SELECT id, username, email, created_at, last_login FROM users WHERE id = ? AND is_active = 1', [id]);
+        const { sql, params } = convertQueryForPostgres('SELECT id, username, email, created_at, last_login FROM users WHERE id = ? AND is_active = 1', [id]);
+        return await getRow(sql, params);
     }
 
     async verifyPassword(username, password) {
@@ -45,11 +61,12 @@ class UserRepository {
     }
 
     async updateLastLogin(userId) {
-        await runQuery('UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?', [userId]);
+        const { sql, params } = convertQueryForPostgres('UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?', [userId]);
+        await runQuery(sql, params);
     }
 
     async getUserStats(userId) {
-        const stats = await getRow(`
+        const { sql, params } = convertQueryForPostgres(`
             SELECT
                 games_played,
                 games_won,
@@ -63,6 +80,7 @@ class UserRepository {
             FROM user_stats
             WHERE user_id = ?
         `, [userId]);
+        const stats = await getRow(sql, params);
 
         if (!stats) {
             // Return default stats if no stats exist yet
@@ -93,7 +111,7 @@ class UserRepository {
     }
 
     async getGameHistory(userId, limit = 20, offset = 0) {
-        const games = await getAllRows(`
+        const { sql, params } = convertQueryForPostgres(`
             SELECT
                 gs.game_id,
                 gs.status,
@@ -116,6 +134,7 @@ class UserRepository {
             LIMIT ? OFFSET ?
         `, [userId, userId, userId, limit, offset]);
 
+        const games = await getAllRows(sql, params);
         return games;
     }
 

@@ -1,37 +1,30 @@
 services:
+  # Backend service - Docker-based deployment with SQLite database
+  # NOTE: Free tier does not support persistent disks
+  # Database will be ephemeral and reset on each deployment
   - type: web
     name: bombing-aircraft-backend
-    runtime: node
-    buildCommand: "cd backend && npm install"
-    startCommand: "cd backend && npm start"
+    env: docker
+    region: singapore
+    plan: free
+    # Docker image from GitHub Container Registry
+    # Image will be built and pushed by GitHub Actions
+    # Format: ghcr.io/<github-username>/bombing-aircraft-backend:latest
+    dockerfilePath: ./Dockerfile.backend
+    dockerContext: .
+    # Auto-deploy disabled - controlled by GitHub Actions
+    autoDeploy: false
     envVars:
       - key: NODE_ENV
         value: production
       - key: PORT
-        fromService:
-          type: web
-          name: bombing-aircraft-backend
-          property: port
+        value: 10000
       - key: CORS_ORIGIN
-        value: https://your-frontend-domain.com
+        value: "*"
       - key: JWT_SECRET
         generateValue: true
       - key: DB_PATH
-        value: /opt/render/project/database.sqlite
+        value: ./database.sqlite
 
-  - type: web
-    name: bombing-aircraft-frontend
-    runtime: static
-    buildCommand: "echo 'Static site - no build needed'"
-    staticPublishPath: ./frontend/public
-    envVars:
-      - key: API_BASE_URL
-        fromService:
-          type: web
-          name: bombing-aircraft-backend
-          property: host
-      - key: SOCKET_URL
-        fromService:
-          type: web
-          name: bombing-aircraft-backend
-          property: host
+# Frontend is deployed separately to Vercel
+# See CI/CD workflow for frontend deployment configuration

@@ -2,7 +2,7 @@ name: CI/CD Pipeline
 
 on:
   push:
-    branches: [ main, master, develop ]
+    branches: [ main, master, develop, 31-create-cicd-pipeline ]
   pull_request:
     branches: [ main, master, develop ]
 
@@ -69,7 +69,7 @@ jobs:
   build:
     needs: test
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/31-create-cicd-pipeline'
 
     steps:
     - name: Checkout code
@@ -93,39 +93,122 @@ jobs:
         mkdir -p backend/public
         cp -r frontend/public/* backend/public/
 
-    - name: Upload build artifacts
+    - name: Upload backend build artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: build-artifacts
+        name: backend-build-artifacts
         path: |
           backend/
           !backend/node_modules/
           !backend/test-*.js
           !backend/simulator.js
 
+    - name: Prepare frontend build artifacts
+      run: |
+        # Create a frontend build directory with all necessary files
+        mkdir -p frontend-build
+        cp -r frontend/public/* frontend-build/
+        cp frontend/vercel.json frontend-build/
+        # List files for debugging
+        echo "Frontend build contents:"
+        ls -la frontend-build/
+        echo "Frontend build prepared successfully"
+
+    - name: Upload frontend build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: frontend-build-artifacts
+        path: frontend-build/
+
   # Deploy to staging
   deploy-staging:
     needs: build
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/develop' && github.event_name == 'push'
+    if: github.ref == 'refs/heads/31-create-cicd-pipeline' && github.event_name == 'push'
     environment: staging
+    outputs:
+      frontend-url: ${{ steps.deploy-frontend.outputs.FRONTEND_URL }}
 
     steps:
-    - name: Download build artifacts
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Download backend build artifacts
       uses: actions/download-artifact@v4
       with:
-        name: build-artifacts
-        path: ./build
+        name: backend-build-artifacts
+        path: ./backend-build
 
-    - name: Deploy to Vercel (Staging)
-      if: env.VERCEL_TOKEN != ''
+    - name: Download frontend build artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: frontend-build-artifacts
+        path: ./frontend-build
+
+    - name: Deploy Backend to Railway (Staging)
+      if: env.RAILWAY_TOKEN_STAGING != ''
       run: |
-        npm install -g vercel
-        cd frontend/public
-        vercel --token ${{ secrets.VERCEL_TOKEN }} --yes
-        echo "Staging frontend deployed to Vercel"
+        npm install -g @railway/cli
+        railway login --token ${{ secrets.RAILWAY_TOKEN_STAGING }}
 
-  # Deploy to production - COMMENTED OUT
+        cd backend-build
+        railway deploy --project ${{ secrets.RAILWAY_PROJECT_ID_STAGING }}
+
+    - name: Deploy Backend to Heroku (Staging)
+      if: env.HEROKU_API_KEY_STAGING != ''
+      uses: akhileshns/heroku-deploy@v3.12.14
+      with:
+        heroku_api_key: ${{ secrets.HEROKU_API_KEY_STAGING }}
+        heroku_app_name: ${{ secrets.HEROKU_APP_NAME_STAGING }}
+        heroku_email: ${{ secrets.HEROKU_EMAIL }}
+        appdir: "backend-build"
+
+    # Downloads the Render CLI binary and adds it to the PATH.
+    # To prevent breaking changes in CI/CD, we pin to a
+    # specific CLI version (in this case 1.1.0).
+    - name: Install Render CLI
+      run: |
+        curl -L https://github.com/render-oss/cli/releases/download/v1.1.0/cli_1.1.0_linux_amd64.zip -o render.zip
+        unzip -o render.zip
+        sudo mv cli_v1.1.0 /usr/local/bin/render
+
+        # Install jq for JSON parsing
+        sudo apt-get update && sudo apt-get install -y jq
+    - name: Deploy Backend to Render
+      id: deploy-backend
+      env:
+        # The CLI can authenticate via a Render API key without logging in.
+        RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+        CI: true
+      run: |
+        echo "Deploying backend to Render..."
+        render deploys create ${{ secrets.RENDER_SERVICE_ID }} --output json --confirm
+
+
+
+
+
+    - name: Deploy Frontend to Vercel
+      id: deploy-frontend
+      run: |
+        echo "Deploying frontend to Vercel..."
+        npm install -g vercel
+        cd frontend-build
+
+        echo "Current directory contents:"
+        pwd && ls -la
+
+        # Deploy to Vercel staging
+        DEPLOY_OUTPUT=$(vercel --token ${{ secrets.VERCEL_TOKEN }} --yes)
+        echo "Vercel deployment output: $DEPLOY_OUTPUT"
+
+        # Extract the deployment URL
+        FRONTEND_URL=$(echo "$DEPLOY_OUTPUT" | grep -o 'https://[^[:space:]]*' | head -1)
+        echo "FRONTEND_URL=$FRONTEND_URL" >> $GITHUB_OUTPUT
+        echo "Frontend deployed to: $FRONTEND_URL"
+
   # deploy-production:
   #   needs: build
   #   runs-on: ubuntu-latest
@@ -176,7 +259,7 @@ jobs:
   #       cd frontend/public
   #       netlify deploy --prod --dir . --auth ${{ secrets.NETLIFY_AUTH_TOKEN }} --site ${{ secrets.NETLIFY_SITE_ID }}
 
-  # Health check after deployment
+  # Health check and integration testing
   health-check:
     needs: [deploy-staging]  # deploy-production commented out
     runs-on: ubuntu-latest
@@ -189,13 +272,39 @@ jobs:
         # Wait for deployment to be ready
         sleep 30
 
-        # Check if the app is responding
-        if curl -f ${{ secrets.STAGING_URL }}/health; then
-          echo "Staging deployment successful!"
-        else
-          echo "Staging health check failed!"
+        # Get URLs from outputs
+        FRONTEND_URL="${{ needs.deploy-staging.outputs.frontend-url }}"
+
+        echo "Backend URL: ${{vars.BACKEND_URL}}"
+        echo "Frontend URL: $FRONTEND_URL"
+
+        # Validate URLs are not empty
+      
+
+        if [ -z "$FRONTEND_URL" ]; then
+          echo "Error: Frontend URL is empty. Deployment may have failed to capture the URL."
           exit 1
         fi
+
+        # Check if the backend is responding
+        if curl -f "${{vars.BACKEND_URL}}/health"; then
+          echo "Backend health check passed!"
+        else
+          echo "Backend health check failed! URL: ${{vars.BACKEND_URL}}/health"
+          exit 1
+        fi
+
+        # Check if the frontend is responding
+        if curl -f "${FRONTEND_URL}"; then
+          echo "Frontend health check passed!"
+        else
+          echo "Frontend health check failed! URL: ${FRONTEND_URL}"
+          exit 1
+        fi
+
+        echo "Staging deployment successful!"
+        echo "Frontend URL: $FRONTEND_URL"
+
 
     # - name: Health check for production
     #   if: needs.deploy-production.result == 'success'
