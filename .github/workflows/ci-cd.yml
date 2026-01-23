@@ -127,7 +127,6 @@ jobs:
     if: github.ref == 'refs/heads/31-create-cicd-pipeline' && github.event_name == 'push'
     environment: staging
     outputs:
-      backend-url: ${{ steps.deploy-backend.outputs.BACKEND_URL }}
       frontend-url: ${{ steps.deploy-frontend.outputs.FRONTEND_URL }}
 
     steps:
@@ -274,17 +273,13 @@ jobs:
         sleep 30
 
         # Get URLs from outputs
-        BACKEND_URL="${{ needs.deploy-staging.outputs.backend-url }}"
         FRONTEND_URL="${{ needs.deploy-staging.outputs.frontend-url }}"
 
-        echo "Backend URL: $BACKEND_URL"
+        echo "Backend URL: ${{env.BACKEND_URL}}"
         echo "Frontend URL: $FRONTEND_URL"
 
         # Validate URLs are not empty
-        if [ -z "$BACKEND_URL" ]; then
-          echo "Error: Backend URL is empty. Deployment may have failed to capture the URL."
-          exit 1
-        fi
+      
 
         if [ -z "$FRONTEND_URL" ]; then
           echo "Error: Frontend URL is empty. Deployment may have failed to capture the URL."
@@ -292,10 +287,10 @@ jobs:
         fi
 
         # Check if the backend is responding
-        if curl -f "${BACKEND_URL}/health"; then
+        if curl -f "${{env.BACKEND_URL}}/health"; then
           echo "Backend health check passed!"
         else
-          echo "Backend health check failed! URL: ${BACKEND_URL}/health"
+          echo "Backend health check failed! URL: ${{env.BACKEND_URL}}/health"
           exit 1
         fi
 
@@ -309,7 +304,7 @@ jobs:
 
         echo "Staging deployment successful!"
         echo "Frontend URL: $FRONTEND_URL"
-        echo "Backend URL: $BACKEND_URL"
+
 
     # - name: Health check for production
     #   if: needs.deploy-production.result == 'success'
