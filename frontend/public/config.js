@@ -5,8 +5,12 @@
     return url.replace(/\/+$/, ''); // trim trailing slashes
   }
 
-  // Use localStorage override for testing, else localhost:3000 for dev
-  const apiBase = normalizeBaseUrl(localStorage.getItem('API_BASE_URL') || window.location.origin.replace('8080', '3000'));
+  // Use localStorage override for testing, else production backend URL, else localhost:3000 for dev
+  const apiBase = normalizeBaseUrl(
+    localStorage.getItem('API_BASE_URL') ||
+    'https://bombing-aircraft-backend.onrender.com' ||
+    window.location.origin.replace('8080', '3000')
+  );
   // Socket.IO server is usually the same as API base. Allow override if needed.
   const socketUrl = normalizeBaseUrl(localStorage.getItem('SOCKET_URL') || apiBase);
 
