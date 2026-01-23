@@ -275,7 +275,7 @@ jobs:
         # Get URLs from outputs
         FRONTEND_URL="${{ needs.deploy-staging.outputs.frontend-url }}"
 
-        echo "Backend URL: ${{env.BACKEND_URL}}"
+        echo "Backend URL: ${{vars.BACKEND_URL}}"
         echo "Frontend URL: $FRONTEND_URL"
 
         # Validate URLs are not empty
@@ -287,10 +287,10 @@ jobs:
         fi
 
         # Check if the backend is responding
-        if curl -f "${{env.BACKEND_URL}}/health"; then
+        if curl -f "${{vars.BACKEND_URL}}/health"; then
           echo "Backend health check passed!"
         else
-          echo "Backend health check failed! URL: ${{env.BACKEND_URL}}/health"
+          echo "Backend health check failed! URL: ${{vars.BACKEND_URL}}/health"
           exit 1
         fi
 
