@@ -1,5 +1,7 @@
 services:
   # Backend service - Docker-based deployment with SQLite database
+  # NOTE: Free tier does not support persistent disks
+  # Database will be ephemeral and reset on each deployment
   - type: web
     name: bombing-aircraft-backend
     env: docker
@@ -12,11 +14,6 @@ services:
     dockerContext: .
     # Auto-deploy disabled - controlled by GitHub Actions
     autoDeploy: false
-    # Persistent disk for SQLite database
-    disk:
-      name: backend-data
-      mountPath: /app/data
-      sizeGB: 1
     envVars:
       - key: NODE_ENV
         value: production
@@ -27,7 +24,7 @@ services:
       - key: JWT_SECRET
         generateValue: true
       - key: DB_PATH
-        value: /app/data/database.sqlite
+        value: ./database.sqlite
 
 # Frontend is deployed separately to Vercel
 # See CI/CD workflow for frontend deployment configuration
