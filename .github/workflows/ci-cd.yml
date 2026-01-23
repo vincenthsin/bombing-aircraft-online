@@ -184,55 +184,47 @@ jobs:
 
     - name: Update Frontend Config with Backend URL
       run: |
-        # Debug: Check current directory and available files
-        pwd
-        ls -la
-        ls -la scripts/ || echo "scripts directory not found"
-        ls -la frontend-build/ || echo "frontend-build directory not found"
-
-        # Update config.js directly with the backend URL
+        echo "Updating frontend configuration with Render backend URL..."
         cd frontend-build
-        # Inject backend URL into HTML files by adding a script tag before the config script
-        sed -i '1i<script>window.__ENV__ = { API_BASE_URL: "${{ steps.deploy-backend.outputs.BACKEND_URL }}", SOCKET_URL: "${{ steps.deploy-backend.outputs.BACKEND_URL }}" };</script>' index.html
-        sed -i '1i<script>window.__ENV__ = { API_BASE_URL: "${{ steps.deploy-backend.outputs.BACKEND_URL }}", SOCKET_URL: "${{ steps.deploy-backend.outputs.BACKEND_URL }}" };</script>' admin.html
 
-        echo "Updated frontend config with backend URL: ${{ steps.deploy-backend.outputs.BACKEND_URL }}"
-
-    - name: Deploy Frontend to Vercel (Staging)
-      run: |
-        # Debug: Check current directory and available files
-        pwd
-        ls -la
-        ls -la scripts/ || echo "scripts directory not found"
-        ls -la frontend-build/ || echo "frontend-build directory not found"
-
-        # Copy the update script to frontend-build directory and run it
+        # Update vercel.json with the actual Render backend URL
         if [ -f "scripts/update-frontend-config.js" ]; then
-          cp scripts/update-frontend-config.js frontend-build/
-          cd frontend-build
-          # Update vercel.json with the actual backend URL using the script
+          cp scripts/update-frontend-config.js .
           node update-frontend-config.js ${{ steps.deploy-backend.outputs.BACKEND_URL }}
         else
-          echo "Script not found, falling back to sed command"
-          cd frontend-build
+          # Fallback: manually update URLs in vercel.json
           sed -i "s|https://your-backend-domain.vercel.app|${{ steps.deploy-backend.outputs.BACKEND_URL }}|g" vercel.json
-          echo "Updated frontend config with backend URL: ${{ steps.deploy-backend.outputs.BACKEND_URL }}"
+          sed -i "s|https://your-frontend-domain.com|${{ steps.deploy-backend.outputs.BACKEND_URL }}|g" vercel.json
         fi
 
-    - name: Deploy Frontend to Vercel (Staging)
+        # Also update any HTML files that might contain API URLs
+        if [ -f "index.html" ]; then
+          sed -i "s|https://your-backend-domain.vercel.app|${{ steps.deploy-backend.outputs.BACKEND_URL }}|g" index.html
+        fi
+        if [ -f "admin.html" ]; then
+          sed -i "s|https://your-backend-domain.vercel.app|${{ steps.deploy-backend.outputs.BACKEND_URL }}|g" admin.html
+        fi
+
+        echo "Frontend config updated with backend URL: ${{ steps.deploy-backend.outputs.BACKEND_URL }}"
+
+    - name: Deploy Frontend to Vercel
       id: deploy-frontend
       run: |
+        echo "Deploying frontend to Vercel..."
         npm install -g vercel
         cd frontend-build
+
         echo "Current directory contents:"
         pwd && ls -la
-        echo "Deploying to Vercel..."
-        # Capture the deployment URL from vercel output
+
+        # Deploy to Vercel staging
         DEPLOY_OUTPUT=$(vercel --token ${{ secrets.VERCEL_TOKEN }} --yes)
-        echo "Vercel output: $DEPLOY_OUTPUT"
+        echo "Vercel deployment output: $DEPLOY_OUTPUT"
+
+        # Extract the deployment URL
         FRONTEND_URL=$(echo "$DEPLOY_OUTPUT" | grep -o 'https://[^[:space:]]*' | head -1)
         echo "FRONTEND_URL=$FRONTEND_URL" >> $GITHUB_OUTPUT
-        echo "Staging frontend deployed to: $FRONTEND_URL"
+        echo "Frontend deployed to: $FRONTEND_URL"
 
   # deploy-production:
   #   needs: build

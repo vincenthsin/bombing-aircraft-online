@@ -1,7 +1,10 @@
 services:
+  # Backend service - Node.js with SQLite database
   - type: web
     name: bombing-aircraft-backend
     runtime: node
+    region: singapore
+    plan: free
     buildCommand: "cd backend && npm install"
     startCommand: "cd backend && npm start"
     envVars:
@@ -13,25 +16,11 @@ services:
           name: bombing-aircraft-backend
           property: port
       - key: CORS_ORIGIN
-        value: *
+        value: "*"
       - key: JWT_SECRET
         generateValue: true
       - key: DB_PATH
         value: /opt/render/project/database.sqlite
 
-  - type: web
-    name: bombing-aircraft-frontend
-    runtime: static
-    buildCommand: "echo 'Static site - no build needed'"
-    staticPublishPath: ./frontend/public
-    envVars:
-      - key: API_BASE_URL
-        fromService:
-          type: web
-          name: bombing-aircraft-backend
-          property: host
-      - key: SOCKET_URL
-        fromService:
-          type: web
-          name: bombing-aircraft-backend
-          property: host
+# Frontend is deployed separately to Vercel
+# See CI/CD workflow for frontend deployment configuration
