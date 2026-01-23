@@ -185,30 +185,10 @@ jobs:
         CI: true
       run: |
         echo "Deploying backend to Render..."
-        DEPLOY_OUTPUT=$(render deploys create ${{ secrets.RENDER_SERVICE_ID }} --output json --confirm)
-        echo "Render deployment output: $DEPLOY_OUTPUT"
+        render deploys create ${{ secrets.RENDER_SERVICE_ID }} --output json --confirm
 
-        # Extract the service URL from the Render deployment output
-        # The JSON output should contain the service URL
-        BACKEND_URL=$(echo "$DEPLOY_OUTPUT" | jq -r '.service.url // .url // empty' 2>/dev/null || echo "")
 
-        # If jq fails or URL is empty, try to get it from service info
-        if [ -z "$BACKEND_URL" ]; then
-          echo "Trying to get service URL from service info..."
-          SERVICE_INFO=$(render services get ${{ secrets.RENDER_SERVICE_ID }} --output json)
-          BACKEND_URL=$(echo "$SERVICE_INFO" | jq -r '.service.url // .url // empty' 2>/dev/null || echo "")
-        fi
 
-        # Fallback: construct URL from service name if available
-        if [ -z "$BACKEND_URL" ]; then
-          SERVICE_NAME=$(render services get ${{ secrets.RENDER_SERVICE_ID }} --output json | jq -r '.service.name // empty' 2>/dev/null || echo "")
-          if [ -n "$SERVICE_NAME" ]; then
-            BACKEND_URL="https://${SERVICE_NAME}.onrender.com"
-          fi
-        fi
-
-        echo "BACKEND_URL=$BACKEND_URL" >> $GITHUB_OUTPUT
-        echo "Backend deployed to: $BACKEND_URL"
 
 
     - name: Deploy Frontend to Vercel
