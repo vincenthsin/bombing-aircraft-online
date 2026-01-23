@@ -137,23 +137,23 @@ The GitHub Actions workflow automatically:
 3. Deploys frontend with correct backend connection
 4. Runs comprehensive integration tests
 
-#### Manual Configuration Update
+#### Configuration
 
-Update frontend configuration with actual backend URL:
-```bash
-# Update frontend/vercel.json with actual backend URL
-npm run update-frontend-config https://your-backend.vercel.app
+The frontend uses runtime configuration and automatically connects to the correct backend:
 
-# Or directly with Node.js
-node scripts/update-frontend-config.js https://your-backend.vercel.app
+- **Development**: Automatically uses `localhost:3000` (with port 8080 redirected)
+- **Production**: Uses localStorage overrides for testing different backends
+- **No build-time configuration required**: The frontend handles all URL resolution at runtime
+
+For testing different backend URLs, use browser developer tools:
+```javascript
+localStorage.setItem('API_BASE_URL', 'https://your-backend.com');
+localStorage.setItem('SOCKET_URL', 'https://your-backend.com');
 ```
 
-#### Dynamic Domain Resolution
+#### Deployment
 
-For platforms like Vercel that generate dynamic domains, the CI/CD pipeline automatically:
-1. Captures deployment URLs from `vercel --yes` output
-2. Updates frontend `vercel.json` environment variables with actual backend URL
-3. Tests the integration with real deployed URLs
+The CI/CD pipeline deploys both frontend and backend separately with automatic health checks.
 
 ### Documentation
 See [CI/CD Setup Guide](docs/CI-CD-SETUP.md) for detailed instructions.

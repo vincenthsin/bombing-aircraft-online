@@ -210,30 +210,6 @@ jobs:
         echo "BACKEND_URL=$BACKEND_URL" >> $GITHUB_OUTPUT
         echo "Backend deployed to: $BACKEND_URL"
 
-    - name: Update Frontend Config with Backend URL
-      run: |
-        echo "Updating frontend configuration with Render backend URL..."
-        cd frontend-build
-
-        # Update vercel.json with the actual Render backend URL
-        if [ -f "scripts/update-frontend-config.js" ]; then
-          cp scripts/update-frontend-config.js .
-          node update-frontend-config.js ${{ steps.deploy-backend.outputs.BACKEND_URL }}
-        else
-          # Fallback: manually update URLs in vercel.json
-          sed -i "s|https://your-backend-domain.vercel.app|${{ steps.deploy-backend.outputs.BACKEND_URL }}|g" vercel.json
-          sed -i "s|https://your-frontend-domain.com|${{ steps.deploy-backend.outputs.BACKEND_URL }}|g" vercel.json
-        fi
-
-        # Also update any HTML files that might contain API URLs
-        if [ -f "index.html" ]; then
-          sed -i "s|https://your-backend-domain.vercel.app|${{ steps.deploy-backend.outputs.BACKEND_URL }}|g" index.html
-        fi
-        if [ -f "admin.html" ]; then
-          sed -i "s|https://your-backend-domain.vercel.app|${{ steps.deploy-backend.outputs.BACKEND_URL }}|g" admin.html
-        fi
-
-        echo "Frontend config updated with backend URL: ${{ steps.deploy-backend.outputs.BACKEND_URL }}"
 
     - name: Deploy Frontend to Vercel
       id: deploy-frontend
