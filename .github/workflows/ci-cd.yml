@@ -157,11 +157,6 @@ jobs:
         cd backend-build
         railway deploy --project ${{ secrets.RAILWAY_PROJECT_ID_STAGING }}
 
-    - name: Deploy Backend to Render (Staging)
-      if: env.RENDER_DEPLOY_HOOK_STAGING != ''
-      run: |
-        curl -X POST ${{ secrets.RENDER_DEPLOY_HOOK_STAGING }}
-
     - name: Deploy Backend to Heroku (Staging)
       if: env.HEROKU_API_KEY_STAGING != ''
       uses: akhileshns/heroku-deploy@v3.12.14
@@ -171,16 +166,21 @@ jobs:
         heroku_email: ${{ secrets.HEROKU_EMAIL }}
         appdir: "backend-build"
 
-    - name: Deploy Backend to Vercel (Staging)
-      id: deploy-backend
+    # Downloads the Render CLI binary and adds it to the PATH.
+    # To prevent breaking changes in CI/CD, we pin to a
+    # specific CLI version (in this case 1.1.0).
+    - name: Install Render CLI
       run: |
-        npm install -g vercel
-        cd backend-build
-        # Capture the deployment URL from vercel output
-        DEPLOY_OUTPUT=$(vercel --token ${{ secrets.VERCEL_TOKEN }} --yes)
-        BACKEND_URL=$(echo "$DEPLOY_OUTPUT" | grep -o 'https://[^[:space:]]*' | head -1)
-        echo "BACKEND_URL=$BACKEND_URL" >> $GITHUB_OUTPUT
-        echo "Staging backend deployed to: $BACKEND_URL"
+        curl -L https://github.com/render-oss/cli/releases/download/v1.1.0/cli_1.1.0_linux_amd64.zip -o render.zip
+        unzip render.zip
+        sudo mv cli_v1.1.0 /usr/local/bin/render
+    - name: Trigger deploy with Render CLI
+      env:
+        # The CLI can authenticate via a Render API key without logging in.
+        RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+        CI: true
+      run: |
+        render deploys create ${{ secrets.RENDER_SERVICE_ID }} --output json --confirm
 
     - name: Update Frontend Config with Backend URL
       run: |
