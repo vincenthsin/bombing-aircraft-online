@@ -6,7 +6,9 @@ const cors = require('cors');
 
 // Import services and repositories
 const userService = require('./src/domain/services/userService');
+
 const gameRepository = require('./src/infrastructure/persistence/gameRepository');
+const RobotPlayer = require('./src/robot/robotPlayer');
 
 const app = express();
 const server = http.createServer(app);
@@ -66,7 +68,9 @@ app.get('/health', (req, res) => {
 // Game State
 const players = {}; // socket.id -> { id, board: [], ships: [], ready: false, connectedAt: timestamp, userId: number, username: string, authToken: string }
 const games = {};   // gameId -> { gameId, player1Id, player2Id, turn: player1Id, status: 'waiting'|'playing'|'finished', startedAt: timestamp, sessionId: number }
-let queue = [];     // [socket.id]
+
+let queue = [];     // [{ socketId, joinTime }]
+const robots = new Set(); // Keep track of active robot instances
 
 // Server Statistics
 const serverStats = {
@@ -140,7 +144,7 @@ app.get('/api/admin/users', (req, res) => {
             ip: player.ip,
             connectedAt: player.connectedAt,
             ready: player.ready,
-            inQueue: queue.includes(player.id),
+            inQueue: queue.some(item => item.socketId === player.id),
             gameId,
             gameStatus
         };
@@ -436,8 +440,11 @@ io.on('connection', (socket) => {
         if (queue.length > 0) {
             // Pop opponents until we find a live socket entry
             let opponentId = null;
+            let opponentEntry = null;
+
             while (queue.length > 0 && !opponentId) {
-                const candidateId = queue.shift();
+                opponentEntry = queue.shift();
+                const candidateId = opponentEntry.socketId;
                 if (players[candidateId]) {
                     opponentId = candidateId;
                 }
@@ -445,7 +452,10 @@ io.on('connection', (socket) => {
 
             if (!opponentId || !players[opponentId]) {
                 // No valid opponent found, re-queue current player
-                if (!queue.includes(socket.id)) queue.push(socket.id);
+                const inQueue = queue.some(item => item.socketId === socket.id);
+                if (!inQueue) {
+                    queue.push({ socketId: socket.id, joinTime: Date.now() });
+                }
                 socket.emit('waiting', 'Waiting for an opponent...');
                 return;
             }
@@ -517,7 +527,7 @@ io.on('connection', (socket) => {
                 isTracked: games[gameId].isTracked
             });
         } else {
-            queue.push(socket.id);
+            queue.push({ socketId: socket.id, joinTime: Date.now() });
             socket.emit('waiting', 'Waiting for an opponent...');
 
             // Notify admin
@@ -579,8 +589,9 @@ io.on('connection', (socket) => {
             delete games[gameId];
 
             resetPlayerState(currentPlayer);
-            if (!queue.includes(socket.id)) {
-                queue.push(socket.id);
+            const inQueue = queue.some(item => item.socketId === socket.id);
+            if (!inQueue) {
+                queue.push({ socketId: socket.id, joinTime: Date.now() });
             }
 
             socket.emit('waiting', 'Opponent left; re-queued for another match.');
@@ -628,8 +639,9 @@ io.on('connection', (socket) => {
 
             const currentPlayer = players[socket.id];
             resetPlayerState(currentPlayer);
-            if (!queue.includes(socket.id)) {
-                queue.push(socket.id);
+            const inQueue = queue.some(item => item.socketId === socket.id);
+            if (!inQueue) {
+                queue.push({ socketId: socket.id, joinTime: Date.now() });
             }
 
             socket.emit('waiting', 'Opponent disconnected; searching for a new match...');
@@ -778,7 +790,7 @@ io.on('connection', (socket) => {
         const player = players[socket.id];
         delete players[socket.id];
         // Handle game cleanup...
-        queue = queue.filter(id => id !== socket.id);
+        queue = queue.filter(item => item.socketId !== socket.id);
 
         // Notify admin
         notifyAdmin('user_disconnected', {
@@ -792,4 +804,31 @@ io.on('connection', (socket) => {
 const PORT = parseInt(process.env.PORT, 10) || 3000;
 server.listen(PORT, () => {
     console.log(`Backend running on http://localhost:${PORT}`);
+
+    // Periodic check for queue timeout
+    setInterval(() => {
+        const now = Date.now();
+        // Check ONLY the first person in queue (longest waiter)
+        // If they waited > 10s, spawn a robot.
+        // The robot will connect -> join_game -> match with this waiter.
+        if (queue.length > 0) {
+            const firstWaiter = queue[0];
+            if (now - firstWaiter.joinTime > 10000) {
+                console.log(`[AutoMatch] User ${firstWaiter.socketId} waited > 10s. Spawning robot...`);
+                // Spawn robot
+                const robot = new RobotPlayer(`http://localhost:${PORT}`);
+                robots.add(robot);
+                robot.start();
+
+                // Cleanup robot when it's done or disconnected to avoid memory leaks
+                // We hook into the 'disconnect' event largely, but let's also have a safe cleanup.
+                const originalStop = robot.stop.bind(robot);
+                robot.stop = () => {
+                    originalStop();
+                    robots.delete(robot);
+                    console.log(`[AutoMatch] Robot cleaned up. Active robots: ${robots.size}`);
+                };
+            }
+        }
+    }, 1000);
 });
