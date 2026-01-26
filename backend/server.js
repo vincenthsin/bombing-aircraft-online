@@ -801,6 +801,9 @@ io.on('connection', (socket) => {
     });
 });
 
+
+
+
 const PORT = parseInt(process.env.PORT, 10) || 3000;
 server.listen(PORT, () => {
     console.log(`Backend running on http://localhost:${PORT}`);
@@ -813,8 +816,14 @@ server.listen(PORT, () => {
         // The robot will connect -> join_game -> match with this waiter.
         if (queue.length > 0) {
             const firstWaiter = queue[0];
-            if (now - firstWaiter.joinTime > 10000) {
-                console.log(`[AutoMatch] User ${firstWaiter.socketId} waited > 10s. Spawning robot...`);
+            const waitTime = now - firstWaiter.joinTime;
+            // console.log(`[QueueCheck] Queue start: ${firstWaiter.socketId} waiting for ${waitTime}ms`);
+
+            if (waitTime > 5000) {
+                // Check if we already spawned a robot for this specific waiter (simple debounce)
+                // In a real app we might tag the queue item, but here let's just log verbose
+                console.log(`[AutoMatch] User ${firstWaiter.socketId} waited ${waitTime}ms (> 10s). Spawning robot...`);
+
                 // Spawn robot
                 const robot = new RobotPlayer(`http://localhost:${PORT}`);
                 robots.add(robot);

@@ -13,7 +13,7 @@ class RobotPlayer {
     constructor(serverUrl) {
         this.serverUrl = serverUrl;
         this.socket = null;
-        
+
         // State
         this.myShips = [];
         this.enemyBoard = Array(100).fill(0); // 0: unknown, 1: shot
@@ -22,14 +22,20 @@ class RobotPlayer {
     }
 
     start() {
+        console.log(`[Robot] Initializing connection to ${this.serverUrl}`);
         this.socket = io(this.serverUrl);
 
-        console.log(`[Robot] Connecting to ${this.serverUrl}...`);
+        console.log(`[Robot] Socket created, waiting for connect event...`);
 
         this.socket.on('connect', () => {
-            console.log(`[Robot ${this.socket.id}] Connected`);
+            console.log(`[Robot ${this.socket.id}] Connected to server`);
             // Join immediately
+            console.log(`[Robot ${this.socket.id}] Emitting join_game...`);
             this.socket.emit('join_game', { anonymous: true });
+        });
+
+        this.socket.on('connect_error', (err) => {
+            console.error(`[Robot] Connection error:`, err.message);
         });
 
         this.socket.on('game_start', (data) => {
@@ -67,10 +73,10 @@ class RobotPlayer {
         });
 
         this.socket.on('disconnect', () => {
-             console.log(`[Robot] Disconnected`);
-             // Don't call stop() here to avoid recursion if stop() calls disconnect()
+            console.log(`[Robot] Disconnected`);
+            // Don't call stop() here to avoid recursion if stop() calls disconnect()
         });
-        
+
         this.socket.on('error', (err) => {
             console.error(`[Robot ${this.socket.id}] Error:`, err);
             this.stop();
@@ -139,8 +145,8 @@ class RobotPlayer {
         if (ships.length === 3) {
             this.socket.emit('place_ships', { gameId: this.gameId, ships });
         } else {
-             console.error(`[Robot ${this.socket.id}] Failed to place ships`);
-             this.stop();
+            console.error(`[Robot ${this.socket.id}] Failed to place ships`);
+            this.stop();
         }
     }
 
@@ -160,9 +166,9 @@ class RobotPlayer {
 
         // If filled up (rare), just pick random
         if (attempts >= 200) {
-             x = Math.floor(Math.random() * 10);
-             y = Math.floor(Math.random() * 10);
-             idx = y * 10 + x;
+            x = Math.floor(Math.random() * 10);
+            y = Math.floor(Math.random() * 10);
+            idx = y * 10 + x;
         }
 
         this.enemyBoard[idx] = 1; // Mark as shot
