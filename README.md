@@ -5,6 +5,7 @@ Built with **Node.js**, **Express**, and **Socket.io**.
 
 ## Features
 - **Real-time Multiplayer**: Play against friends instantly.
+- **Robot Matchmaking**: Automatically matches with a robot opponent if no players are found after 5 seconds.
 - **Modern UI**: Dark-mode, sci-fi aesthetic with responsive grid layout.
 - **Drag & Drop**: Easy ship placement with rotation support.
 - **Socket.io**: Instant game state synchronization.
@@ -295,7 +296,8 @@ The aircraft is a **Heavy Bomber** (10 Cells):
     - **MISS** (Gray): Hitting empty water.
     - **HIT** (Red): Hitting the wings, body, or tail.
     - **FATAL** (Black): Hitting the **Head** instantly destroys the entire aircraft.
-3.  **Victory**: Destroy all 3 enemy aircraft to win.
+4.  **Auto-Matching**: If you wait more than 5 seconds in the lobby, a robot opponent will satisfy your thirst for battle!
+5.  **Victory**: Destroy all 3 enemy aircraft to win.
 
 ## Deployment & CI/CD
 
