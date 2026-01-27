@@ -187,6 +187,7 @@ h3 {
         opacity: 0.6;
         box-shadow: 0 0 5px var(--neon-green);
     }
+
     100% {
         opacity: 1;
         box-shadow: 0 0 15px var(--neon-green), inset 0 0 10px var(--neon-green);
@@ -467,7 +468,7 @@ h3 {
     transition: all 0.3s ease;
 }
 
-.checkbox-container input:checked ~ .checkmark {
+.checkbox-container input:checked~.checkmark {
     background-color: var(--neon-blue);
 }
 
@@ -477,7 +478,7 @@ h3 {
     display: none;
 }
 
-.checkbox-container input:checked ~ .checkmark:after {
+.checkbox-container input:checked~.checkmark:after {
     display: block;
 }
 
@@ -661,4 +662,26 @@ h3 {
         margin-bottom: 20px;
         justify-content: center;
     }
+}
+
+/* Highlight Confirm Button */
+@keyframes button-pulse {
+    0% {
+        box-shadow: 0 0 5px var(--neon-blue);
+    }
+
+    50% {
+        box-shadow: 0 0 20px var(--neon-blue), inset 0 0 10px var(--neon-blue);
+    }
+
+    100% {
+        box-shadow: 0 0 5px var(--neon-blue);
+    }
+}
+
+#confirm-placement-btn {
+    animation: button-pulse 1.5s infinite;
+    background: var(--neon-blue);
+    color: var(--bg-color);
+    font-weight: bold;
 }
