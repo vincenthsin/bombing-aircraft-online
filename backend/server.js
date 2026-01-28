@@ -819,13 +819,13 @@ server.listen(PORT, () => {
             const waitTime = now - firstWaiter.joinTime;
             // console.log(`[QueueCheck] Queue start: ${firstWaiter.socketId} waiting for ${waitTime}ms`);
 
-            if (waitTime > 5000) {
+            if (waitTime > 3000) {
                 // Check if we already spawned a robot for this specific waiter (simple debounce)
                 // In a real app we might tag the queue item, but here let's just log verbose
-                console.log(`[AutoMatch] User ${firstWaiter.socketId} waited ${waitTime}ms (> 10s). Spawning robot...`);
+                console.log(`[AutoMatch] User ${firstWaiter.socketId} waited ${waitTime}ms (> 3s). Spawning robot...`);
 
-                // Spawn robot
-                const robot = new RobotPlayer(`http://localhost:${PORT}`);
+                // Spawn robot - use 127.0.0.1 to avoid IPv6 localhost resolution issues in Docker
+                const robot = new RobotPlayer(`http://127.0.0.1:${PORT}`);
                 robots.add(robot);
                 robot.start();
 
