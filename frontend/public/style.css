@@ -81,6 +81,16 @@ h3 {
     box-shadow: 0 0 20px var(--neon-blue);
 }
 
+.cyber-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    border-color: #555;
+    color: #777;
+    box-shadow: none;
+    background: transparent;
+    pointer-events: none;
+}
+
 .cyber-btn.secondary {
     border-color: var(--neon-green);
     color: var(--neon-green);
@@ -684,4 +694,12 @@ h3 {
     background: var(--neon-blue);
     color: var(--bg-color);
     font-weight: bold;
+    width: 260px;
+    min-width: 260px;
+    max-width: 260px;
+    text-align: center;
+    white-space: nowrap;
+    box-sizing: border-box;
+    padding: 15px 10px;
+    /* Reduce horizontal padding to rely on width */
 }
