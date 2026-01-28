@@ -617,14 +617,12 @@ function placeShip(x, y) {
         pendingShip = { coords, core: { x, y }, rotation };
         renderPlacementBoard();
 
-        // Show confirm button
-        document.getElementById('confirm-placement-btn').style.display = 'block';
+        // Show confirm button (enable it)
         updateDeployButton();
     } else {
-        // If invalid, clear pending ship and hide button
+        // If invalid, clear pending ship
         pendingShip = null;
         renderPlacementBoard(); // Re-render to clear any old pending display
-        document.getElementById('confirm-placement-btn').style.display = 'none';
         updateDeployButton();
     }
 }
@@ -658,8 +656,8 @@ function updateDeployButton() {
     const totalConfirmed = PLACED_SHIPS.length;
 
     if (totalConfirmed === 3) {
-        // All ships placed and confirmed, button should be hidden or already triggered deploy
-        btn.style.display = 'none';
+        // All ships placed and confirmed, button should be disabled
+        btn.disabled = true;
         return;
     }
 
@@ -670,10 +668,11 @@ function updateDeployButton() {
             btn.innerText = `${t("confirm_ship")} (${totalConfirmed + 1}/3)`;
         }
         btn.disabled = false;
-        btn.style.display = 'block'; // Ensure it's visible when a pending ship exists
+        // btn.style.display = 'block'; // Already visible
     } else {
         // No pending ship selected yet for this slot
-        btn.style.display = 'none'; // Hide if no pending ship to confirm
+        btn.innerText = t("confirm_ship");
+        btn.disabled = true;
     }
 }
 
@@ -691,7 +690,7 @@ document.getElementById('reset-btn').addEventListener('click', () => {
     pendingShip = null;
     renderPlacementBoard();
     updateDeployButton();
-    document.getElementById('confirm-placement-btn').style.display = 'none';
+    // document.getElementById('confirm-placement-btn').style.display = 'none'; // handled by updateDeployButton
 });
 
 document.getElementById('confirm-placement-btn').addEventListener('click', () => {
@@ -703,12 +702,13 @@ document.getElementById('confirm-placement-btn').addEventListener('click', () =>
         if (PLACED_SHIPS.length === 3) {
             socket.emit('place_ships', { gameId, ships: PLACED_SHIPS });
             document.getElementById('placement-msg').innerText = t('waiting_opponent');
-            document.getElementById('confirm-placement-btn').style.display = 'none';
-            document.getElementById('reset-btn').style.display = 'none';
-            document.getElementById('rotate-btn').style.display = 'none';
+            
+            // Freeze all buttons instead of hiding
+            document.getElementById('confirm-placement-btn').disabled = true;
+            document.getElementById('reset-btn').disabled = true;
+            document.getElementById('rotate-btn').disabled = true;
         } else {
             updateDeployButton();
-            document.getElementById('confirm-placement-btn').style.display = 'none';
         }
     }
 });
