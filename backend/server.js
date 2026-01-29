@@ -8,6 +8,7 @@ const cors = require('cors');
 const userService = require('./src/domain/services/userService');
 
 const gameRepository = require('./src/infrastructure/persistence/gameRepository');
+const settingsRepository = require('./src/infrastructure/persistence/settingsRepository');
 const RobotPlayer = require('./src/robot/robotPlayer');
 
 const app = express();
@@ -79,6 +80,26 @@ const serverStats = {
     peakConcurrentUsers: 0,
     totalGamesPlayed: 0
 };
+
+// Application Settings (cached in memory)
+let matchmakingTimeout = 3000; // Default 3s
+
+const { initializationPromise } = require('./src/infrastructure/persistence/database');
+
+// Load settings from database
+async function loadSettings() {
+    try {
+        await initializationPromise;
+        const timeout = await settingsRepository.getSetting('matchmaking_timeout');
+        if (timeout !== null) {
+            matchmakingTimeout = parseInt(timeout, 10);
+            console.log(`Loaded matchmaking_timeout: ${matchmakingTimeout}ms`);
+        }
+    } catch (error) {
+        console.error('Error loading settings:', error);
+    }
+}
+loadSettings();
 
 // Admin API Routes
 app.post('/api/admin/auth', (req, res) => {
@@ -165,6 +186,36 @@ app.get('/api/admin/games', (req, res) => {
     }));
 
     res.json(gameList);
+});
+
+app.get('/api/admin/settings', async (req, res) => {
+    try {
+        const settings = await settingsRepository.getAllSettings();
+        res.json({ success: true, settings });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+app.post('/api/admin/settings', async (req, res) => {
+    try {
+        const { key, value } = req.body;
+        if (!key || value === undefined) {
+            return res.status(400).json({ success: false, message: 'Key and value are required' });
+        }
+
+        await settingsRepository.updateSetting(key, value);
+
+        // Update local cache
+        if (key === 'matchmaking_timeout') {
+            matchmakingTimeout = parseInt(value, 10);
+            console.log(`Updated matchmaking_timeout to ${matchmakingTimeout}ms`);
+        }
+
+        res.json({ success: true, message: 'Setting updated' });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
 });
 
 // User Authentication Routes
@@ -819,10 +870,10 @@ server.listen(PORT, () => {
             const waitTime = now - firstWaiter.joinTime;
             // console.log(`[QueueCheck] Queue start: ${firstWaiter.socketId} waiting for ${waitTime}ms`);
 
-            if (waitTime > 3000) {
+            if (waitTime > matchmakingTimeout) {
                 // Check if we already spawned a robot for this specific waiter (simple debounce)
                 // In a real app we might tag the queue item, but here let's just log verbose
-                console.log(`[AutoMatch] User ${firstWaiter.socketId} waited ${waitTime}ms (> 3s). Spawning robot...`);
+                console.log(`[AutoMatch] User ${firstWaiter.socketId} waited ${waitTime}ms (> ${matchmakingTimeout}ms). Spawning robot...`);
 
                 // Spawn robot - use 127.0.0.1 to avoid IPv6 localhost resolution issues in Docker
                 const robot = new RobotPlayer(`http://127.0.0.1:${PORT}`);

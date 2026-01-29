@@ -73,6 +73,22 @@ async function setupPostgresDatabase() {
             )
         `;
 
+        // System settings table
+        await sql`
+            CREATE TABLE IF NOT EXISTS settings (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL,
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            )
+        `;
+
+        // Insert default matchmaking_timeout if it doesn't exist
+        await sql`
+            INSERT INTO settings (key, value)
+            VALUES ('matchmaking_timeout', '3000')
+            ON CONFLICT (key) DO NOTHING
+        `;
+
         console.log('PostgreSQL database tables created successfully!');
     } catch (error) {
         console.error('Error setting up PostgreSQL database:', error);

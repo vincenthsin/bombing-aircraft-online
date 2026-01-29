@@ -21,6 +21,9 @@ const passwordInput = document.getElementById('password-input');
 const authError = document.getElementById('auth-error');
 const logoutBtn = document.getElementById('logout-btn');
 const clearLogBtn = document.getElementById('clear-log-btn');
+const settingsForm = document.getElementById('settings-form');
+const matchmakingTimeoutInput = document.getElementById('matchmaking-timeout');
+const settingsMessage = document.getElementById('settings-message');
 
 // Statistics Elements
 const statActiveUsers = document.getElementById('stat-active-users');
@@ -108,7 +111,7 @@ authForm.addEventListener('submit', async (e) => {
 // Logout
 logoutBtn.addEventListener('click', async () => {
     const token = sessionStorage.getItem(SESSION_KEY);
-    
+
     // Notify server to invalidate the session
     if (token) {
         try {
@@ -121,7 +124,7 @@ logoutBtn.addEventListener('click', async () => {
             console.error('Logout error:', error);
         }
     }
-    
+
     sessionStorage.removeItem(SESSION_KEY);
     isAuthenticated = false;
     dashboardScreen.classList.remove('active');
@@ -209,6 +212,7 @@ function initializeDashboard() {
     fetchStats();
     fetchUsers();
     fetchGames();
+    fetchSettings();
 
     // Set up periodic refresh
     statsInterval = setInterval(() => {
@@ -216,6 +220,65 @@ function initializeDashboard() {
         fetchUsers();
         fetchGames();
     }, 5000); // Refresh every 5 seconds
+}
+
+// Fetch Settings
+async function fetchSettings() {
+    try {
+        const response = await fetch(apiUrl('/api/admin/settings'));
+        const data = await response.json();
+
+        if (data.success && data.settings) {
+            const timeout = data.settings.find(s => s.key === 'matchmaking_timeout');
+            if (timeout) {
+                matchmakingTimeoutInput.value = timeout.value;
+            }
+        }
+    } catch (error) {
+        console.error('Error fetching settings:', error);
+    }
+}
+
+// Handle Settings Update
+settingsForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const value = matchmakingTimeoutInput.value;
+
+    try {
+        const response = await fetch(apiUrl('/api/admin/settings'), {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                key: 'matchmaking_timeout',
+                value: value
+            })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            showSettingsMessage('✅ Setting updated successfully', 'success');
+            addLogEntry('system', `Updated matchmaking_timeout to ${value}ms`);
+        } else {
+            showSettingsMessage('❌ Error: ' + data.message, 'error');
+        }
+    } catch (error) {
+        showSettingsMessage('❌ Connection error', 'error');
+        console.error('Settings update error:', error);
+    }
+});
+
+function showSettingsMessage(msg, type) {
+    settingsMessage.textContent = msg;
+    settingsMessage.className = `settings-message ${type}`;
+
+    // Clear message after 3 seconds
+    setTimeout(() => {
+        settingsMessage.textContent = '';
+        settingsMessage.className = 'settings-message';
+    }, 3000);
 }
 
 // Fetch Statistics

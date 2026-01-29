@@ -352,6 +352,72 @@ body::before {
     animation: fadeIn 1s ease-out;
 }
 
+.settings-panel {
+    grid-column: 1 / -1;
+    margin-bottom: 20px;
+}
+
+.settings-form {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 30px;
+}
+
+.setting-item {
+    flex: 1;
+    min-width: 300px;
+}
+
+.setting-item label {
+    display: block;
+    margin-bottom: 10px;
+    color: var(--primary-cyan);
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.input-with-button {
+    display: flex;
+    gap: 10px;
+}
+
+.input-with-button input {
+    flex: 1;
+    padding: 10px 15px;
+    background: rgba(11, 12, 16, 0.6);
+    border: 1px solid var(--glass-border);
+    border-radius: 5px;
+    color: var(--text-white);
+    font-family: inherit;
+}
+
+.input-with-button input:focus {
+    outline: none;
+    border-color: var(--primary-cyan);
+}
+
+.setting-desc {
+    font-size: 0.75rem;
+    color: var(--text-light);
+    opacity: 0.7;
+    margin-top: 8px;
+}
+
+.settings-message {
+    width: 100%;
+    font-size: 0.85rem;
+    min-height: 20px;
+    margin-top: 10px;
+}
+
+.settings-message.success {
+    color: var(--success-green);
+}
+
+.settings-message.error {
+    color: var(--error-red);
+}
+
 .event-log-panel {
     grid-column: 1 / -1;
 }

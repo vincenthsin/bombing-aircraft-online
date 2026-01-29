@@ -95,6 +95,26 @@
 
             <!-- Main Content Grid -->
             <div class="content-grid">
+                <!-- Settings Panel -->
+                <section class="panel settings-panel">
+                    <div class="panel-header">
+                        <h2>⚙️ Game Settings</h2>
+                    </div>
+                    <div class="panel-body">
+                        <form id="settings-form" class="settings-form">
+                            <div class="setting-item">
+                                <label for="matchmaking-timeout">Matchmaking Timeout (ms)</label>
+                                <div class="input-with-button">
+                                    <input type="number" id="matchmaking-timeout" min="1000" step="500" value="3000">
+                                    <button type="submit" class="cyber-btn mini">UPDATE</button>
+                                </div>
+                                <p class="setting-desc">Time to wait before spawning a robot player.</p>
+                            </div>
+                            <div id="settings-message" class="settings-message"></div>
+                        </form>
+                    </div>
+                </section>
+
                 <!-- Users Panel -->
                 <section class="panel">
                     <div class="panel-header">

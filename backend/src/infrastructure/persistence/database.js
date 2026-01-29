@@ -62,7 +62,7 @@ if (USE_POSTGRES) {
     // SQLite specific functions
     runQuery = (sql, params = []) => {
         return new Promise((resolve, reject) => {
-            sqliteDb.run(sql, params, function(err) {
+            sqliteDb.run(sql, params, function (err) {
                 if (err) {
                     reject(err);
                 } else {
@@ -99,78 +99,113 @@ if (USE_POSTGRES) {
     db = sqliteDb;
 }
 
+const initializationPromise = new Promise((resolve) => {
+    if (USE_POSTGRES) {
+        resolve(); // Postgres setup is handled separately
+    } else {
+        // The callback for new sqlite3.Database already calls initializeDatabase
+        // We'll signal readiness at the end of initializeDatabase
+        const checkInterval = setInterval(() => {
+            if (dbInitialized) {
+                clearInterval(checkInterval);
+                resolve();
+            }
+        }, 50);
+    }
+});
+
+let dbInitialized = false;
+
 // Initialize database tables (SQLite only)
 function initializeDatabase() {
     if (!USE_POSTGRES) {
-        // Users table
-        db.run(`
-            CREATE TABLE IF NOT EXISTS users (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                username TEXT UNIQUE NOT NULL,
-                email TEXT UNIQUE NOT NULL,
-                password_hash TEXT NOT NULL,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                last_login DATETIME,
-                is_active BOOLEAN DEFAULT 1
-            )
-        `);
+        db.serialize(() => {
+            // Users table
+            db.run(`
+                CREATE TABLE IF NOT EXISTS users (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    username TEXT UNIQUE NOT NULL,
+                    email TEXT UNIQUE NOT NULL,
+                    password_hash TEXT NOT NULL,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    last_login DATETIME,
+                    is_active BOOLEAN DEFAULT 1
+                )
+            `);
 
-        // Game sessions table
-        db.run(`
-            CREATE TABLE IF NOT EXISTS game_sessions (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                game_id TEXT UNIQUE NOT NULL,
-                player1_id INTEGER NOT NULL,
-                player2_id INTEGER NOT NULL,
-                status TEXT DEFAULT 'waiting', -- waiting, placing, playing, finished
-                winner_id INTEGER,
-                started_at DATETIME,
-                finished_at DATETIME,
-                duration_seconds INTEGER,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (player1_id) REFERENCES users(id),
-                FOREIGN KEY (player2_id) REFERENCES users(id),
-                FOREIGN KEY (winner_id) REFERENCES users(id)
-            )
-        `);
+            // Game sessions table
+            db.run(`
+                CREATE TABLE IF NOT EXISTS game_sessions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    game_id TEXT UNIQUE NOT NULL,
+                    player1_id INTEGER NOT NULL,
+                    player2_id INTEGER NOT NULL,
+                    status TEXT DEFAULT 'waiting', -- waiting, placing, playing, finished
+                    winner_id INTEGER,
+                    started_at DATETIME,
+                    finished_at DATETIME,
+                    duration_seconds INTEGER,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (player1_id) REFERENCES users(id),
+                    FOREIGN KEY (player2_id) REFERENCES users(id),
+                    FOREIGN KEY (winner_id) REFERENCES users(id)
+                )
+            `);
 
-        // Game moves table (for detailed history)
-        db.run(`
-            CREATE TABLE IF NOT EXISTS game_moves (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                game_session_id INTEGER NOT NULL,
-                player_id INTEGER NOT NULL,
-                move_type TEXT NOT NULL, -- 'shoot', 'place_ships'
-                x INTEGER,
-                y INTEGER,
-                result TEXT, -- 'hit', 'miss', 'fatal'
-                move_number INTEGER NOT NULL,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (game_session_id) REFERENCES game_sessions(id),
-                FOREIGN KEY (player_id) REFERENCES users(id)
-            )
-        `);
+            // Game moves table (for detailed history)
+            db.run(`
+                CREATE TABLE IF NOT EXISTS game_moves (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    game_session_id INTEGER NOT NULL,
+                    player_id INTEGER NOT NULL,
+                    move_type TEXT NOT NULL, -- 'shoot', 'place_ships'
+                    x INTEGER,
+                    y INTEGER,
+                    result TEXT, -- 'hit', 'miss', 'fatal'
+                    move_number INTEGER NOT NULL,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (game_session_id) REFERENCES game_sessions(id),
+                    FOREIGN KEY (player_id) REFERENCES users(id)
+                )
+            `);
 
-        // User statistics table
-        db.run(`
-            CREATE TABLE IF NOT EXISTS user_stats (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER UNIQUE NOT NULL,
-                games_played INTEGER DEFAULT 0,
-                games_won INTEGER DEFAULT 0,
-                games_lost INTEGER DEFAULT 0,
-                total_shots INTEGER DEFAULT 0,
-                hits INTEGER DEFAULT 0,
-                misses INTEGER DEFAULT 0,
-                fatal_hits INTEGER DEFAULT 0,
-                average_game_duration REAL DEFAULT 0,
-                win_rate REAL DEFAULT 0,
-                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES users(id)
-            )
-        `);
+            // User statistics table
+            db.run(`
+                CREATE TABLE IF NOT EXISTS user_stats (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER UNIQUE NOT NULL,
+                    games_played INTEGER DEFAULT 0,
+                    games_won INTEGER DEFAULT 0,
+                    games_lost INTEGER DEFAULT 0,
+                    total_shots INTEGER DEFAULT 0,
+                    hits INTEGER DEFAULT 0,
+                    misses INTEGER DEFAULT 0,
+                    fatal_hits INTEGER DEFAULT 0,
+                    average_game_duration REAL DEFAULT 0,
+                    win_rate REAL DEFAULT 0,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users(id)
+                )
+            `);
 
-        console.log('Database tables initialized.');
+            // System settings table
+            db.run(`
+                CREATE TABLE IF NOT EXISTS settings (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            `);
+
+            // Insert default matchmaking_timeout if it doesn't exist
+            db.run(`
+                INSERT OR IGNORE INTO settings (key, value)
+                VALUES ('matchmaking_timeout', '3000')
+            `);
+
+            console.log('Database tables initialized.');
+            dbInitialized = true;
+        });
     }
 }
 
@@ -178,5 +213,6 @@ module.exports = {
     db,
     runQuery,
     getRow,
-    getAllRows
+    getAllRows,
+    initializationPromise
 };
