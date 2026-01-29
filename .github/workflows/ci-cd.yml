@@ -209,11 +209,20 @@ jobs:
         echo "FRONTEND_URL=$FRONTEND_URL" >> $GITHUB_OUTPUT
         echo "Frontend deployed to: $FRONTEND_URL"
 
-  # deploy-production:
-  #   needs: build
-  #   runs-on: ubuntu-latest
-  #   if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
-  #   environment: production
+  deploy-production:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - name: Upload Pages Artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          # Point this to your specific subfolder
+          path: 'frontend/public'
+      - name: Deploy to GitHub Pages
+        uses: actions/deploy-pages@v4
 
   #   steps:
   #   - name: Download build artifacts
