@@ -11,6 +11,8 @@ env:
   BACKEND_DIR: './backend'
   VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
   VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository_owner }}/bombing-aircraft-backend
 
 jobs:
   # Test job - runs tests and linting
@@ -120,11 +122,105 @@ jobs:
         name: frontend-build-artifacts
         path: frontend-build/
 
-  # Deploy to staging
-  deploy-staging:
+  # Deploy Backend to staging using Docker and Render API
+  deploy-backend:
     needs: build
     runs-on: ubuntu-latest
-    if: github.ref == 'master' && github.event_name == 'merge'
+    if: (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main') && github.event_name == 'push'
+    environment: staging
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Log in to GitHub Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Extract metadata for Docker
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        tags: |
+          type=raw,value=latest,enable={{is_default_branch}}
+          type=sha,prefix={{branch}}-,format=short
+          type=ref,event=branch
+
+    - name: Build and push Docker image
+      id: build
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./Dockerfile.backend
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        platforms: linux/amd64
+
+    - name: Trigger Render Deployment
+      id: trigger-deploy
+      env:
+        RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+        RENDER_SERVICE_ID: ${{ secrets.RENDER_SERVICE_ID }}
+      run: |
+        echo "Deploying to Render..."
+        RESPONSE=$(curl -s -X POST \
+          "https://api.render.com/v1/services/${RENDER_SERVICE_ID}/deploys" \
+          -H "Authorization: Bearer ${RENDER_API_KEY}" \
+          -H "Content-Type: application/json" \
+          -d '{"clearCache": "do_not_clear"}')
+        
+        DEPLOY_ID=$(echo $RESPONSE | jq -r '.id // empty')
+        if [ -z "$DEPLOY_ID" ]; then
+          echo "Failed to trigger deployment. Response: $RESPONSE"
+          exit 1
+        fi
+        echo "DEPLOY_ID=$DEPLOY_ID" >> $GITHUB_ENV
+
+    - name: Wait for Render deployment to complete
+      env:
+        RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+        RENDER_SERVICE_ID: ${{ secrets.RENDER_SERVICE_ID }}
+      run: |
+        echo "Waiting for deployment to complete..."
+        MAX_WAIT=600
+        ELAPSED=0
+        while [ $ELAPSED -lt $MAX_WAIT ]; do
+          STATUS_RESPONSE=$(curl -s \
+            "https://api.render.com/v1/services/${RENDER_SERVICE_ID}/deploys/${DEPLOY_ID}" \
+            -H "Authorization: Bearer ${RENDER_API_KEY}")
+          STATUS=$(echo $STATUS_RESPONSE | jq -r '.status // empty')
+          echo "Deployment status: $STATUS (${ELAPSED}s elapsed)"
+          if [ "$STATUS" = "live" ]; then
+            echo "Deployment completed successfully!"
+            exit 0
+          elif [ "$STATUS" = "build_failed" ] || [ "$STATUS" = "deploy_failed" ] || [ "$STATUS" = "canceled" ]; then
+            echo "Deployment failed with status: $STATUS"
+            exit 1
+          fi
+          sleep 15
+          ELAPSED=$((ELAPSED + 15))
+        done
+        echo "Deployment timed out"
+        exit 1
+
+  # Deploy Frontend to staging
+  deploy-frontend:
+    needs: build
+    runs-on: ubuntu-latest
+    if: (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main') && github.event_name == 'push'
     environment: staging
     outputs:
       frontend-url: ${{ steps.deploy-frontend.outputs.FRONTEND_URL }}
@@ -132,14 +228,6 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-
-    - name: Download backend build artifacts
-      uses: actions/download-artifact@v4
-      with:
-        name: backend-build-artifacts
-        path: ./backend-build
 
     - name: Download frontend build artifacts
       uses: actions/download-artifact@v4
@@ -147,82 +235,22 @@ jobs:
         name: frontend-build-artifacts
         path: ./frontend-build
 
-    - name: Deploy Backend to Railway (Staging)
-      if: env.RAILWAY_TOKEN_STAGING != ''
-      run: |
-        npm install -g @railway/cli
-        railway login --token ${{ secrets.RAILWAY_TOKEN_STAGING }}
-
-        cd backend-build
-        railway deploy --project ${{ secrets.RAILWAY_PROJECT_ID_STAGING }}
-
-    - name: Deploy Backend to Heroku (Staging)
-      if: env.HEROKU_API_KEY_STAGING != ''
-      uses: akhileshns/heroku-deploy@v3.12.14
-      with:
-        heroku_api_key: ${{ secrets.HEROKU_API_KEY_STAGING }}
-        heroku_app_name: ${{ secrets.HEROKU_APP_NAME_STAGING }}
-        heroku_email: ${{ secrets.HEROKU_EMAIL }}
-        appdir: "backend-build"
-
-    # Downloads the Render CLI binary and adds it to the PATH.
-    # To prevent breaking changes in CI/CD, we pin to a
-    # specific CLI version (in this case 1.1.0).
-    - name: Install Render CLI
-      run: |
-        curl -L https://github.com/render-oss/cli/releases/download/v1.1.0/cli_1.1.0_linux_amd64.zip -o render.zip
-        unzip -o render.zip
-        sudo mv cli_v1.1.0 /usr/local/bin/render
-
-        # Install jq for JSON parsing
-        sudo apt-get update && sudo apt-get install -y jq
-    - name: Deploy Backend to Render
-      id: deploy-backend
-      env:
-        # The CLI can authenticate via a Render API key without logging in.
-        RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
-        CI: true
-      run: |
-        echo "Deploying backend to Render..."
-        render deploys create ${{ secrets.RENDER_SERVICE_ID }} --output json --confirm
-
-
-
-
-
     - name: Deploy Frontend to Vercel
       id: deploy-frontend
       run: |
         echo "Deploying frontend to Vercel..."
         npm install -g vercel
         cd frontend-build
-
-        echo "Current directory contents:"
-        pwd && ls -la
-
-        # Deploy to Vercel staging
         DEPLOY_OUTPUT=$(vercel --token ${{ secrets.VERCEL_TOKEN }} --yes)
-        echo "Vercel deployment output: $DEPLOY_OUTPUT"
-
-        # Extract the deployment URL
         FRONTEND_URL=$(echo "$DEPLOY_OUTPUT" | grep -o 'https://[^[:space:]]*' | head -1)
         echo "FRONTEND_URL=$FRONTEND_URL" >> $GITHUB_OUTPUT
         echo "Frontend deployed to: $FRONTEND_URL"
 
-  deploy-production:
-    needs: build
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
-    environment: production
-    steps:
-      - uses: actions/checkout@v4
-      - name: Upload Pages Artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          # Point this to your specific subfolder
-          path: 'frontend/public'
-      - name: Deploy to GitHub Pages
-        uses: actions/deploy-pages@v4
+  # deploy-production:
+  #   needs: build
+  #   runs-on: ubuntu-latest
+  #   if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+  #   environment: production
 
   #   steps:
   #   - name: Download build artifacts
@@ -270,19 +298,18 @@ jobs:
 
   # Health check and integration testing
   health-check:
-    needs: [deploy-staging]  # deploy-production commented out
+    needs: [deploy-backend, deploy-frontend]
     runs-on: ubuntu-latest
-    if: always() && needs.deploy-staging.result == 'success'
+    if: always() && needs.deploy-backend.result == 'success' && needs.deploy-frontend.result == 'success'
 
     steps:
     - name: Health check for staging
-      if: needs.deploy-staging.result == 'success'
       run: |
         # Wait for deployment to be ready
         sleep 30
 
         # Get URLs from outputs
-        FRONTEND_URL="${{ needs.deploy-staging.outputs.frontend-url }}"
+        FRONTEND_URL="${{ needs.deploy-frontend.outputs.frontend-url }}"
 
         echo "Backend URL: ${{vars.BACKEND_URL}}"
         echo "Frontend URL: $FRONTEND_URL"
@@ -336,12 +363,10 @@ jobs:
     if: always()
 
     steps:
-    - name: Send Slack notification
-      if: env.SLACK_WEBHOOK_URL != ''
-      uses: 8398a7/action-slack@v3
-      with:
-        status: ${{ job.status }}
-        webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
-        fields: repo,message,commit,author,action,eventName,ref,workflow
+    - name: Send Discord notification
+      if: always()
+      uses: Ilshidur/action-discord@master
       env:
-        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+      with:
+        args: 'Deployment status for ${{ github.repository }}: ${{ job.status }}. Commit: ${{ github.sha }}'
