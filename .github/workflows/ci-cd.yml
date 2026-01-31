@@ -336,12 +336,10 @@ jobs:
     if: always()
 
     steps:
-    - name: Send Slack notification
-      if: env.SLACK_WEBHOOK_URL != ''
-      uses: 8398a7/action-slack@v3
-      with:
-        status: ${{ job.status }}
-        webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
-        fields: repo,message,commit,author,action,eventName,ref,workflow
+    - name: Send Discord notification
+      if: always()
+      uses: Ilshidur/action-discord@master
       env:
-        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+      with:
+        args: 'Deployment status for ${{ github.repository }}: ${{ job.status }}. Commit: ${{ github.sha }}'
