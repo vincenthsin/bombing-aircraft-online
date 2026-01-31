@@ -120,14 +120,12 @@ jobs:
         name: frontend-build-artifacts
         path: frontend-build/
 
-  # Deploy to staging
-  deploy-staging:
+  # Deploy Backend to staging
+  deploy-backend:
     needs: build
     runs-on: ubuntu-latest
-    if: github.ref == 'master' && github.event_name == 'merge'
+    if: (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main') && github.event_name == 'push'
     environment: staging
-    outputs:
-      frontend-url: ${{ steps.deploy-frontend.outputs.FRONTEND_URL }}
 
     steps:
     - name: Checkout code
@@ -140,12 +138,6 @@ jobs:
       with:
         name: backend-build-artifacts
         path: ./backend-build
-
-    - name: Download frontend build artifacts
-      uses: actions/download-artifact@v4
-      with:
-        name: frontend-build-artifacts
-        path: ./frontend-build
 
     - name: Deploy Backend to Railway (Staging)
       if: env.RAILWAY_TOKEN_STAGING != ''
@@ -165,30 +157,40 @@ jobs:
         heroku_email: ${{ secrets.HEROKU_EMAIL }}
         appdir: "backend-build"
 
-    # Downloads the Render CLI binary and adds it to the PATH.
-    # To prevent breaking changes in CI/CD, we pin to a
-    # specific CLI version (in this case 1.1.0).
     - name: Install Render CLI
       run: |
         curl -L https://github.com/render-oss/cli/releases/download/v1.1.0/cli_1.1.0_linux_amd64.zip -o render.zip
         unzip -o render.zip
         sudo mv cli_v1.1.0 /usr/local/bin/render
-
-        # Install jq for JSON parsing
         sudo apt-get update && sudo apt-get install -y jq
+
     - name: Deploy Backend to Render
       id: deploy-backend
       env:
-        # The CLI can authenticate via a Render API key without logging in.
         RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
         CI: true
       run: |
         echo "Deploying backend to Render..."
         render deploys create ${{ secrets.RENDER_SERVICE_ID }} --output json --confirm
 
+  # Deploy Frontend to staging
+  deploy-frontend:
+    needs: build
+    runs-on: ubuntu-latest
+    if: (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main') && github.event_name == 'push'
+    environment: staging
+    outputs:
+      frontend-url: ${{ steps.deploy-frontend.outputs.FRONTEND_URL }}
 
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
 
-
+    - name: Download frontend build artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: frontend-build-artifacts
+        path: ./frontend-build
 
     - name: Deploy Frontend to Vercel
       id: deploy-frontend
@@ -196,33 +198,16 @@ jobs:
         echo "Deploying frontend to Vercel..."
         npm install -g vercel
         cd frontend-build
-
-        echo "Current directory contents:"
-        pwd && ls -la
-
-        # Deploy to Vercel staging
         DEPLOY_OUTPUT=$(vercel --token ${{ secrets.VERCEL_TOKEN }} --yes)
-        echo "Vercel deployment output: $DEPLOY_OUTPUT"
-
-        # Extract the deployment URL
         FRONTEND_URL=$(echo "$DEPLOY_OUTPUT" | grep -o 'https://[^[:space:]]*' | head -1)
         echo "FRONTEND_URL=$FRONTEND_URL" >> $GITHUB_OUTPUT
         echo "Frontend deployed to: $FRONTEND_URL"
 
-  deploy-production:
-    needs: build
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
-    environment: production
-    steps:
-      - uses: actions/checkout@v4
-      - name: Upload Pages Artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          # Point this to your specific subfolder
-          path: 'frontend/public'
-      - name: Deploy to GitHub Pages
-        uses: actions/deploy-pages@v4
+  # deploy-production:
+  #   needs: build
+  #   runs-on: ubuntu-latest
+  #   if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+  #   environment: production
 
   #   steps:
   #   - name: Download build artifacts
@@ -270,19 +255,18 @@ jobs:
 
   # Health check and integration testing
   health-check:
-    needs: [deploy-staging]  # deploy-production commented out
+    needs: [deploy-backend, deploy-frontend]
     runs-on: ubuntu-latest
-    if: always() && needs.deploy-staging.result == 'success'
+    if: always() && needs.deploy-backend.result == 'success' && needs.deploy-frontend.result == 'success'
 
     steps:
     - name: Health check for staging
-      if: needs.deploy-staging.result == 'success'
       run: |
         # Wait for deployment to be ready
         sleep 30
 
         # Get URLs from outputs
-        FRONTEND_URL="${{ needs.deploy-staging.outputs.frontend-url }}"
+        FRONTEND_URL="${{ needs.deploy-frontend.outputs.frontend-url }}"
 
         echo "Backend URL: ${{vars.BACKEND_URL}}"
         echo "Frontend URL: $FRONTEND_URL"
